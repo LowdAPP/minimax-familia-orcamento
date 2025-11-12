@@ -13,11 +13,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Logging middleware para debug
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`);
+  console.log(`${req.method} ${req.path} - Content-Type: ${req.get('Content-Type') || 'none'}`);
   next();
 });
 
@@ -301,6 +305,24 @@ function extractMerchant(description) {
   const words = merchant.split(' ').slice(0, 5).join(' ');
   return words.substring(0, 60);
 }
+
+// Error handler global
+app.use((err, req, res, next) => {
+  console.error('Erro capturado:', err);
+  res.status(500).json({
+    success: false,
+    error: err.message || 'Erro interno do servidor'
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Rota não encontrada',
+    path: req.path
+  });
+});
 
 app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
