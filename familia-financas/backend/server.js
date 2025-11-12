@@ -19,9 +19,11 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Logging middleware para debug
+// Logging middleware para debug (mas não para /health para evitar problemas)
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path} - Content-Type: ${req.get('Content-Type') || 'none'}`);
+  if (req.path !== '/health') {
+    console.log(`${req.method} ${req.path} - Content-Type: ${req.get('Content-Type') || 'none'}`);
+  }
   next();
 });
 
@@ -43,14 +45,23 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Health check - deve ser a primeira rota para evitar problemas
+// Usar antes de qualquer outro middleware que possa interferir
 app.get('/health', (req, res) => {
-  console.log('Health check chamado');
-  res.status(200).json({ 
+  console.log('✅ Health check chamado - método:', req.method, 'path:', req.path);
+  console.log('✅ Headers:', JSON.stringify(req.headers));
+  
+  // Resposta simples e direta
+  const response = { 
     status: 'ok', 
     timestamp: new Date().toISOString(),
     service: 'pdf-processor-backend',
     version: '1.0.0'
-  });
+  };
+  
+  console.log('✅ Enviando resposta:', JSON.stringify(response));
+  
+  res.setHeader('Content-Type', 'application/json');
+  res.status(200).send(JSON.stringify(response));
 });
 
 // Endpoint para processar PDF
