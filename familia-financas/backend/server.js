@@ -13,15 +13,20 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // HEALTH CHECK - PRIMEIRA COISA, ANTES DE QUALQUER MIDDLEWARE
-// Isso garante que funcione mesmo se houver problemas com outras inicializações
+// Versão ultra-simples para garantir que funcione
 app.get('/health', (req, res) => {
-  console.log('✅✅✅ Health check chamado');
-  res.status(200).json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    service: 'pdf-processor-backend',
-    version: '1.0.0'
-  });
+  console.log('✅✅✅ Health check chamado - método:', req.method);
+  try {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString()
+    }));
+  } catch (error) {
+    console.error('Erro no health check:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'error', error: error.message }));
+  }
 });
 
 // Middleware
@@ -325,9 +330,10 @@ app.use((req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
-  console.log(`📡 Health check: http://localhost:${PORT}/health`);
-  console.log(`📄 Processar PDF: POST http://localhost:${PORT}/api/process-pdf`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀🚀🚀 Servidor iniciado na porta ${PORT}`);
+  console.log(`📡 Health check: http://0.0.0.0:${PORT}/health`);
+  console.log(`📄 Processar PDF: POST http://0.0.0.0:${PORT}/api/process-pdf`);
+  console.log(`✅ Servidor pronto!`);
 });
 
