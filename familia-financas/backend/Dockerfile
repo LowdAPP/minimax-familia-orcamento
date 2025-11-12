@@ -1,21 +1,24 @@
-# Dockerfile para garantir uso de Node.js
+# Dockerfile otimizado para Railway
 FROM node:18-alpine
 
-# Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar package.json primeiro para aproveitar cache do Docker
-COPY package.json ./
+# Copiar package files
+COPY package*.json ./
 
-# Instalar dependências
-RUN npm install
+# Instalar dependências com cache
+RUN npm ci --only=production
 
-# Copiar todo o código restante
+# Copiar código-fonte
 COPY . .
 
 # Expor porta (Railway define PORT via variável de ambiente)
 EXPOSE 3000
 
-# Comando para iniciar o servidor
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 3000) + '/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+
+# Iniciar servidor
 CMD ["node", "server.js"]
 
