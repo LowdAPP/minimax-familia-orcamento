@@ -12,22 +12,16 @@ import pdfParse from 'pdf-parse';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// HEALTH CHECK - PRIMEIRA COISA, ANTES DE QUALQUER OUTRO MIDDLEWARE
+// HEALTH CHECK - PRIMEIRA COISA, ANTES DE QUALQUER MIDDLEWARE
 // Isso garante que funcione mesmo se houver problemas com outras inicializações
 app.get('/health', (req, res) => {
-  console.log('✅✅✅ Health check chamado - método:', req.method, 'path:', req.path);
-  console.log('✅ Headers:', JSON.stringify(req.headers));
-  
-  const response = { 
+  console.log('✅✅✅ Health check chamado');
+  res.status(200).json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
     service: 'pdf-processor-backend',
     version: '1.0.0'
-  };
-  
-  console.log('✅ Enviando resposta:', JSON.stringify(response));
-  
-  res.status(200).json(response);
+  });
 });
 
 // Middleware
@@ -37,11 +31,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Logging middleware para debug (mas não para /health para evitar problemas)
+// Logging middleware para debug
 app.use((req, res, next) => {
-  if (req.path !== '/health') {
-    console.log(`${req.method} ${req.path} - Content-Type: ${req.get('Content-Type') || 'none'}`);
-  }
+  console.log(`${req.method} ${req.path}`);
   next();
 });
 
