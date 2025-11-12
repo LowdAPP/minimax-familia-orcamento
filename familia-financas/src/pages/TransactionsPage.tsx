@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useI18n } from '../hooks/useI18n';
 import { supabase } from '../lib/supabase';
+// PDF parsing agora é feito no backend
+// import { extractTextFromPDF, parseTransactionsFromText } from '../lib/pdfParser';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -190,87 +192,51 @@ export default function TransactionsPage() {
         setAccounts([newAccount]);
       }
 
-      setUploadProgress('Processando PDF e extraindo transações...');
+      setUploadProgress('Enviando PDF para processamento...');
 
-      // 1. Enviar PDF diretamente para o edge function via FormData
+      // URL do backend (Railway ou local)
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+
+      // 1. Enviar PDF para o backend
       const formData = new FormData();
       formData.append('file', file);
       formData.append('user_id', user.id);
       formData.append('account_id', accountId);
 
-      // Obter token de autenticação
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Sessão não encontrada');
+      console.log('📤 Enviando PDF para backend:', backendUrl);
 
-      // Fazer request direto para o edge function
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      if (!supabaseUrl) throw new Error('Missing VITE_SUPABASE_URL environment variable');
-      
-      const response = await fetch(`${supabaseUrl}/functions/v1/pdf-parser`, {
+      const response = await fetch(`${backendUrl}/api/process-pdf`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-        },
         body: formData
       });
 
-      // Tentar parsear resposta mesmo se não for 200 OK
-      let result;
-      try {
-        result = await response.json();
-      } catch (jsonError) {
-        throw new Error('Erro ao processar resposta do servidor. Tente novamente.');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
+        throw new Error(errorData.error || `Erro HTTP ${response.status}`);
       }
 
-      console.log('Resultado do parse:', result);
+      const result = await response.json();
+      console.log('✅ Resultado:', result);
 
-      // 2. Verificar resultado e mostrar mensagens específicas
       if (!result.success) {
-        const errorCode = result.errorCode || 'UNKNOWN';
-        const errorMessage = result.error || 'Erro ao processar PDF';
-        const suggestion = result.suggestion || '';
-        
-        // Mensagens de erro contextualizadas
-        let userMessage = errorMessage;
-        if (suggestion) {
-          userMessage += `\n\n💡 ${suggestion}`;
-        }
-        
-        // Adicionar informação sobre formato detectado se disponível
-        if (result.bankFormat && result.bankFormat !== 'Desconhecido') {
-          userMessage += `\n\n📋 Formato detectado: ${result.bankFormat}`;
-        }
-        
-        alert(userMessage);
+        alert(result.error || 'Erro ao processar PDF');
         setUploadProgress('');
         setUploading(false);
         return;
       }
 
       const transactionCount = result.transactionsInserted || 0;
-      const bankFormat = result.bankFormat || '';
-      
+
       if (transactionCount === 0) {
-        let message = 'Nenhuma transação foi encontrada no PDF.';
-        if (bankFormat && bankFormat !== 'Desconhecido') {
-          message += `\n\nFormato detectado: ${bankFormat}`;
-        }
-        message += '\n\n💡 Verifique se o arquivo contém transações visíveis (não imagens escaneadas).';
-        
-        alert(message);
+        alert('Nenhuma transação foi encontrada no PDF.\n\n💡 Verifique se o arquivo contém transações visíveis (não imagens escaneadas).');
         setUploadProgress('');
         setUploading(false);
         return;
       }
 
-      // Mostrar mensagem de sucesso com detalhes
-      let successMessage = `✅ ${transactionCount} transações importadas com sucesso!`;
-      if (bankFormat && bankFormat !== 'Desconhecido') {
-        successMessage += ` (${bankFormat})`;
-      }
-      setUploadProgress(successMessage);
-      
-      // 3. Recarregar transações
+      setUploadProgress(`✅ ${transactionCount} transações importadas com sucesso!`);
+
+      // 2. Recarregar transações
       setTimeout(() => {
         loadTransactions();
         setUploadProgress('');
@@ -278,8 +244,27 @@ export default function TransactionsPage() {
       }, 2000);
 
     } catch (error: any) {
-      console.error('Erro ao processar PDF:', error);
-      alert(`Erro ao processar PDF: ${error.message}`);
+      console.error('❌ Erro completo ao processar PDF:', error);
+      
+      let errorMessage = 'Erro ao processar PDF';
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (error.toString) {
+        errorMessage = error.toString();
+      }
+      
+      // Mensagens mais amigáveis para erros comuns
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
+        errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente.';
+      } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        errorMessage = 'Sessão expirada. Por favor, faça login novamente.';
+      } else if (errorMessage.includes('404')) {
+        errorMessage = 'Serviço não encontrado. Verifique se a edge function está deployada.';
+      } else if (errorMessage.includes('500')) {
+        errorMessage = 'Erro no servidor. Por favor, tente novamente mais tarde.';
+      }
+      
+      alert(`❌ ${errorMessage}`);
       setUploadProgress('');
       setUploading(false);
     }
