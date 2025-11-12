@@ -3,13 +3,20 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copiar package files primeiro (para cache de dependências)
-COPY package.json ./
+# Verificar se package.json existe (debug)
+RUN ls -la /app || echo "Diretório vazio"
 
-# Instalar dependências (incluindo devDependencies para build se necessário)
+# Copiar package files primeiro (para cache de dependências)
+# Usar caminho absoluto relativo ao contexto
+COPY ./package.json ./
+
+# Verificar se foi copiado
+RUN ls -la package.json || (echo "ERRO: package.json não encontrado" && exit 1)
+
+# Instalar dependências
 RUN npm install
 
-# Copiar todo o código
+# Copiar todo o código restante
 COPY . .
 
 # Expor porta (Railway define PORT automaticamente via env)
