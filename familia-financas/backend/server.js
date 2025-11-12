@@ -8,7 +8,6 @@ import cors from 'cors';
 import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
 import pdfParse from 'pdf-parse';
-import fs from 'fs';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
