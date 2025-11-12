@@ -43,9 +43,26 @@ Ou manualmente:
 
 ## 6. Obter URL do Backend
 
-Após o deploy, Railway fornecerá uma URL como:
+Após o deploy, Railway fornecerá uma URL pública. Para encontrar:
+
+1. No Railway, vá em seu serviço
+2. Clique na aba **Settings**
+3. Role até **Networking**
+4. Você verá a **Public Domain** (ex: `seu-projeto.up.railway.app`)
+5. Ou clique em **Generate Domain** se não tiver uma
+
+**URLs:**
+- ❌ Interna (não funciona de fora): `https://minimax-familia-orcamento.railway.internal`
+- ✅ Pública (use esta): `https://seu-projeto.up.railway.app`
+
+**Teste o health check:**
 ```
-https://seu-projeto.up.railway.app
+https://seu-projeto.up.railway.app/health
+```
+
+Deve retornar:
+```json
+{"status":"ok","timestamp":"2025-11-12T22:15:00.000Z"}
 ```
 
 ## 7. Configurar Frontend
