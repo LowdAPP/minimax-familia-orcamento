@@ -14,6 +14,13 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
+
+// Logging middleware para debug
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  next();
+});
+
 // Não usar express.json() globalmente para evitar problemas com FormData
 // Aplicaremos apenas onde necessário
 
@@ -33,18 +40,13 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Health check - deve ser a primeira rota para evitar problemas
 app.get('/health', (req, res) => {
-  try {
-    res.status(200).json({ 
-      status: 'ok', 
-      timestamp: new Date().toISOString(),
-      service: 'pdf-processor-backend'
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      status: 'error', 
-      error: error.message 
-    });
-  }
+  console.log('Health check chamado');
+  res.status(200).json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    service: 'pdf-processor-backend',
+    version: '1.0.0'
+  });
 });
 
 // Endpoint para processar PDF
