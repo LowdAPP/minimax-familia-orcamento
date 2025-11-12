@@ -14,8 +14,9 @@ O backend está pronto em `familia-financas/backend/`
 ## 3. Conectar Repositório (se usar GitHub)
 
 1. Selecione seu repositório
-2. Railway detectará automaticamente o Node.js
-3. Configure o **Root Directory** como `familia-financas/backend`
+2. **IMPORTANTE:** Configure o **Root Directory** como `familia-financas/backend`
+3. Railway deve detectar Node.js automaticamente (verifique se não está usando Deno)
+4. Se Railway tentar usar Deno, force Node.js nas configurações do serviço
 
 ## 4. Configurar Variáveis de Ambiente
 
