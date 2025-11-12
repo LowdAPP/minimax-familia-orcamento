@@ -1,0 +1,13 @@
+{
+  "buildCommand": "cd familia-financas && pnpm install && pnpm build",
+  "outputDirectory": "familia-financas/dist",
+  "installCommand": "cd familia-financas && pnpm install",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+
