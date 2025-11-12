@@ -1,0 +1,66 @@
+{
+  "common": {
+    "submit": "Enviar",
+    "cancel": "Cancelar",
+    "save": "Salvar", 
+    "edit": "Editar",
+    "delete": "Excluir",
+    "confirm": "Confirmar",
+    "loading": "Carregando...",
+    "error": "Erro",
+    "success": "Sucesso",
+    "warning": "Aviso",
+    "info": "Informação"
+  },
+  "navigation": {
+    "home": "Início",
+    "dashboard": "Painel",
+    "transactions": "Transações",
+    "budget": "Orçamento", 
+    "goals": "Metas",
+    "settings": "Configurações",
+    "logout": "Sair",
+    "login": "Entrar",
+    "signup": "Registrar"
+  },
+  "auth": {
+    "login": "Entrar",
+    "signup": "Registrar",
+    "email": "E-mail",
+    "password": "Senha",
+    "confirmPassword": "Confirmar Senha", 
+    "forgotPassword": "Esqueci a senha",
+    "resetPassword": "Redefinir senha",
+    "dontHaveAccount": "Não tem uma conta?",
+    "alreadyHaveAccount": "Já tem uma conta?",
+    "invalidEmail": "E-mail inválido",
+    "passwordMismatch": "As senhas não coincidem",
+    "loginError": "Erro ao fazer login",
+    "signupError": "Erro ao registrar conta", 
+    "signupSuccess": "Conta criada com sucesso!"
+  },
+  "dashboard": {
+    "welcome": "Bem-vindo de volta",
+    "totalBalance": "Saldo Total",
+    "monthlyIncome": "Renda Mensal",
+    "monthlyExpenses": "Despesas Mensais",
+    "savings": "Poupança",
+    "recentTransactions": "Transações Recentes",
+    "addTransaction": "Adicionar Transação",
+    "uploadStatement": "Enviar Extrato PDF",
+    "viewAll": "Ver Todos", 
+    "financialHealth": "Saúde Financeira",
+    "good": "Boa",
+    "needsAttention": "Atenção Necessária",
+    "poor": "Ruim"
+  },
+  "premium": {
+    "upgrade": "Upgrade Premium",
+    "features": "Funcionalidades Premium",
+    "price": "R$ 180,00",
+    "perYear": "por ano",
+    "currentPlan": "Plano Atual", 
+    "premiumPlan": "Plano Premium",
+    "cancelAnytime": "Cancele a qualquer momento"
+  }
+}

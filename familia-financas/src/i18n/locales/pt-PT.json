@@ -1,0 +1,66 @@
+{
+  "common": {
+    "submit": "Submeter",
+    "cancel": "Cancelar", 
+    "save": "Guardar",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "confirm": "Confirmar",
+    "loading": "A carregar...",
+    "error": "Erro",
+    "success": "Sucesso",
+    "warning": "Aviso",
+    "info": "Informação"
+  },
+  "navigation": {
+    "home": "Início",
+    "dashboard": "Painel", 
+    "transactions": "Movimentos",
+    "budget": "Orçamento",
+    "goals": "Metas",
+    "settings": "Configurações",
+    "logout": "Sair",
+    "login": "Entrar",
+    "signup": "Registar"
+  },
+  "auth": {
+    "login": "Entrar",
+    "signup": "Registar", 
+    "email": "Email",
+    "password": "Palavra-passe",
+    "confirmPassword": "Confirmar Palavra-passe",
+    "forgotPassword": "Esqueci a palavra-passe",
+    "resetPassword": "Repor palavra-passe",
+    "dontHaveAccount": "Não tem conta?",
+    "alreadyHaveAccount": "Já tem conta?",
+    "invalidEmail": "Email inválido",
+    "passwordMismatch": "As palavras-passe não coincidem",
+    "loginError": "Erro ao iniciar sessão",
+    "signupError": "Erro ao registar conta",
+    "signupSuccess": "Conta criada com sucesso!"
+  },
+  "dashboard": {
+    "welcome": "Bem-vindo de volta",
+    "totalBalance": "Saldo Total",
+    "monthlyIncome": "Rendimento Mensal", 
+    "monthlyExpenses": "Despesas Mensais",
+    "savings": "Poupança",
+    "recentTransactions": "Movimentos Recentes",
+    "addTransaction": "Adicionar Movimento",
+    "uploadStatement": "Enviar Extrato PDF",
+    "viewAll": "Ver Todos",
+    "financialHealth": "Saúde Financeira",
+    "good": "Boa",
+    "needsAttention": "Atenção Necessária", 
+    "poor": "Pobre"
+  },
+  "premium": {
+    "upgrade": "Upgrade Premium",
+    "features": "Funcionalidades Premium",
+    "price": "29,97€",
+    "perYear": "por ano",
+    "currentPlan": "Plano Atual",
+    "premiumPlan": "Plano Premium",
+    "cancelAnytime": "Cancele a qualquer momento"
+  }
+}
