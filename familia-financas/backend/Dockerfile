@@ -1,11 +1,10 @@
 # Dockerfile para garantir uso de Node.js
 FROM node:18-alpine
 
+# Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar package.json primeiro (para cache de dependências)
-# Se Root Directory estiver configurado como familia-financas/backend,
-# o contexto já será esse diretório, então package.json está na raiz
+# Copiar package.json primeiro para aproveitar cache do Docker
 COPY package.json ./
 
 # Instalar dependências
@@ -14,9 +13,9 @@ RUN npm install
 # Copiar todo o código restante
 COPY . .
 
-# Expor porta (Railway define PORT automaticamente via env)
+# Expor porta (Railway define PORT via variável de ambiente)
 EXPOSE 3000
 
-# Comando para iniciar
+# Comando para iniciar o servidor
 CMD ["node", "server.js"]
 
