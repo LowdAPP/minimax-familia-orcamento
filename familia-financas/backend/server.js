@@ -3,11 +3,18 @@
  * Deploy no Railway
  */
 
+console.log('🔧 Iniciando servidor...');
+console.log('📦 Node version:', process.version);
+console.log('📁 Working directory:', process.cwd());
+console.log('🌍 Environment:', process.env.NODE_ENV || 'development');
+
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
 import pdfParse from 'pdf-parse';
+
+console.log('✅ Dependências importadas');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
