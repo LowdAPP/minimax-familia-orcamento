@@ -14,20 +14,8 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
-// Express.json com tratamento de erro para evitar problemas
-app.use(express.json({ 
-  limit: '10mb',
-  verify: (req, res, buf) => {
-    // Só tentar parsear se houver conteúdo
-    if (buf && buf.length) {
-      try {
-        JSON.parse(buf);
-      } catch (e) {
-        // Ignorar erros de JSON em rotas que não precisam
-      }
-    }
-  }
-}));
+// Não usar express.json() globalmente para evitar problemas com FormData
+// Aplicaremos apenas onde necessário
 
 // Configurar multer para upload de arquivos
 const upload = multer({ storage: multer.memoryStorage() });
