@@ -11,5 +11,5 @@ cmds = ["npm install"]
 cmds = ["echo 'No build step needed'"]
 
 [start]
-cmd = "node server.js"
+cmd = "node test-server.js"
 
