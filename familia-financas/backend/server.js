@@ -60,8 +60,7 @@ app.get('/health', (req, res) => {
   
   console.log('✅ Enviando resposta:', JSON.stringify(response));
   
-  res.setHeader('Content-Type', 'application/json');
-  res.status(200).send(JSON.stringify(response));
+  res.status(200).json(response);
 });
 
 // Endpoint para processar PDF
