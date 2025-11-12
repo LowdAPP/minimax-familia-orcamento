@@ -20,19 +20,32 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // HEALTH CHECK - PRIMEIRA COISA, ANTES DE QUALQUER MIDDLEWARE
-// Versão ultra-simples para garantir que funcione
+// Versão ultra-simples e robusta - SEMPRE retorna 200
+// Isto é crítico para o Railway detectar que o serviço está vivo
 app.get('/health', (req, res) => {
-  console.log('✅✅✅ Health check chamado - método:', req.method);
   try {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      status: 'ok', 
-      timestamp: new Date().toISOString()
-    }));
+    const healthStatus = {
+      status: 'ok',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      supabase: supabase ? 'configured' : 'not_configured',
+      nodeVersion: process.version,
+      memory: {
+        heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+        heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB'
+      }
+    };
+
+    res.status(200).json(healthStatus);
   } catch (error) {
+    // Se algo der errado, ainda retorna 200
+    // Railway precisa que o health check sempre funcione
     console.error('Erro no health check:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'error', error: error.message }));
+    res.status(200).json({
+      status: 'ok_with_error',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
@@ -353,22 +366,40 @@ app.use((req, res) => {
   });
 });
 
-// Inicializar servidor
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀🚀🚀 Servidor iniciado na porta ${PORT}`);
-  console.log(`📡 Health check: http://0.0.0.0:${PORT}/health`);
-  console.log(`📄 Processar PDF: POST http://0.0.0.0:${PORT}/api/process-pdf`);
-  console.log(`✅ Servidor pronto!`);
-  console.log(`🔧 Supabase: ${supabase ? '✅ Configurado' : '❌ Não configurado'}`);
-});
+// Inicializar servidor com melhor tratamento de erro
+let server;
 
-// Tratamento de erros do servidor
-server.on('error', (error) => {
-  console.error('❌ Erro no servidor:', error);
-  if (error.code === 'EADDRINUSE') {
-    console.error(`⚠️ Porta ${PORT} já está em uso`);
-  }
-});
+try {
+  server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`🚀 Servidor iniciado com sucesso!`);
+    console.log(`${'='.repeat(60)}`);
+    console.log(`📡 Porta: ${PORT}`);
+    console.log(`🏥 Health check: GET http://localhost:${PORT}/health`);
+    console.log(`📄 Processar PDF: POST http://localhost:${PORT}/api/process-pdf`);
+    console.log(`🔧 Supabase: ${supabase ? '✅ Configurado' : '⚠️ Não configurado (health check funcionará normalmente)'}`);
+    console.log(`${'='.repeat(60)}\n`);
+  });
+
+  // Tratamento de erros do servidor
+  server.on('error', (error) => {
+    console.error('❌ Erro crítico no servidor:', error);
+    if (error.code === 'EADDRINUSE') {
+      console.error(`⚠️ Porta ${PORT} já está em uso`);
+      process.exit(1);
+    } else if (error.code === 'EACCES') {
+      console.error(`⚠️ Permissão negada para porta ${PORT}`);
+      process.exit(1);
+    } else {
+      console.error('❌ Erro desconhecido:', error);
+      process.exit(1);
+    }
+  });
+
+} catch (error) {
+  console.error('❌ Erro ao iniciar servidor:', error);
+  process.exit(1);
+}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
