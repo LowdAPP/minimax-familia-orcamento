@@ -48,16 +48,24 @@ app.use((req, res, next) => {
 // Configurar multer para upload de arquivos
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Cliente Supabase
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+// Cliente Supabase (inicializar depois do health check para não bloquear)
+let supabase = null;
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('❌ Erro: Variáveis de ambiente SUPABASE_URL e SUPABASE_KEY são obrigatórias');
-  process.exit(1);
+function initializeSupabase() {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('❌ Erro: Variáveis de ambiente SUPABASE_URL e SUPABASE_KEY são obrigatórias');
+    console.error('⚠️ Servidor iniciará mas endpoints de PDF não funcionarão');
+    return null;
+  }
+
+  return createClient(supabaseUrl, supabaseKey);
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Inicializar Supabase após definir rotas
+supabase = initializeSupabase();
 
 // Endpoint para processar PDF
 app.post('/api/process-pdf', upload.single('file'), async (req, res) => {
@@ -118,6 +126,14 @@ app.post('/api/process-pdf', upload.single('file'), async (req, res) => {
     }));
 
     // 4. Inserir no banco de dados
+    if (!supabase) {
+      return res.status(500).json({
+        success: false,
+        error: 'Supabase não configurado. Verifique as variáveis de ambiente.',
+        transactionsInserted: 0
+      });
+    }
+
     const { data, error } = await supabase
       .from('transactions')
       .insert(transactionsToInsert)
@@ -330,10 +346,29 @@ app.use((req, res) => {
   });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+// Inicializar servidor
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀🚀🚀 Servidor iniciado na porta ${PORT}`);
   console.log(`📡 Health check: http://0.0.0.0:${PORT}/health`);
   console.log(`📄 Processar PDF: POST http://0.0.0.0:${PORT}/api/process-pdf`);
   console.log(`✅ Servidor pronto!`);
+  console.log(`🔧 Supabase: ${supabase ? '✅ Configurado' : '❌ Não configurado'}`);
+});
+
+// Tratamento de erros do servidor
+server.on('error', (error) => {
+  console.error('❌ Erro no servidor:', error);
+  if (error.code === 'EADDRINUSE') {
+    console.error(`⚠️ Porta ${PORT} já está em uso`);
+  }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🛑 SIGTERM recebido, encerrando servidor...');
+  server.close(() => {
+    console.log('✅ Servidor encerrado');
+    process.exit(0);
+  });
 });
 
