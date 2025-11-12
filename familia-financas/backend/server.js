@@ -12,6 +12,24 @@ import pdfParse from 'pdf-parse';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// HEALTH CHECK - PRIMEIRA COISA, ANTES DE QUALQUER OUTRO MIDDLEWARE
+// Isso garante que funcione mesmo se houver problemas com outras inicializações
+app.get('/health', (req, res) => {
+  console.log('✅✅✅ Health check chamado - método:', req.method, 'path:', req.path);
+  console.log('✅ Headers:', JSON.stringify(req.headers));
+  
+  const response = { 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    service: 'pdf-processor-backend',
+    version: '1.0.0'
+  };
+  
+  console.log('✅ Enviando resposta:', JSON.stringify(response));
+  
+  res.status(200).json(response);
+});
+
 // Middleware
 app.use(cors({
   origin: '*',
@@ -43,25 +61,6 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Health check - deve ser a primeira rota para evitar problemas
-// Usar antes de qualquer outro middleware que possa interferir
-app.get('/health', (req, res) => {
-  console.log('✅ Health check chamado - método:', req.method, 'path:', req.path);
-  console.log('✅ Headers:', JSON.stringify(req.headers));
-  
-  // Resposta simples e direta
-  const response = { 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    service: 'pdf-processor-backend',
-    version: '1.0.0'
-  };
-  
-  console.log('✅ Enviando resposta:', JSON.stringify(response));
-  
-  res.status(200).json(response);
-});
 
 // Endpoint para processar PDF
 app.post('/api/process-pdf', upload.single('file'), async (req, res) => {
