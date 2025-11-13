@@ -181,11 +181,11 @@ const server = http.createServer(async (req, res) => {
 
       console.log(`[${timestamp}] Found ${transactions.length} transactions`);
 
-      // Retorna resultado
+      // Retorna resultado com transações extraídas
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         success: true,
-        message: 'PDF processado com sucesso',
+        message: 'PDF processado com transações extraídas via parser real',
         transactionsFound: transactions.length,
         transactions: transactions.slice(0, 50), // Retorna primeiras 50
         pdfPages: pdfData.numpages,
