@@ -15,6 +15,9 @@ RUN npm ci --only=production && npm list
 COPY familia-financas/backend/server.js .
 COPY familia-financas/backend/start.sh .
 
+# Force rebuild with timestamp
+ENV BUILD_TIMESTAMP=2025-11-13T17:25:00Z
+
 RUN chmod +x start.sh
 
 EXPOSE 3000
