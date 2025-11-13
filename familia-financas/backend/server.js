@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-// Deploy timestamp: 2025-11-13T21:22:00Z - REAL PDF PARSER WITH TRANSACTION EXTRACTION
-// Version: 1.0.3 - Restored original Dockerfile structure for successful deployment
 
 const http = require('http');
+const querystring = require('querystring');
 const pdfParse = require('pdf-parse');
 const PORT = process.env.PORT || 3000;
 
@@ -182,11 +181,11 @@ const server = http.createServer(async (req, res) => {
 
       console.log(`[${timestamp}] Found ${transactions.length} transactions`);
 
-      // Retorna resultado com transações extraídas
+      // Retorna resultado
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         success: true,
-        message: 'PDF processado com transações extraídas via parser real',
+        message: 'PDF processado com sucesso',
         transactionsFound: transactions.length,
         transactions: transactions.slice(0, 50), // Retorna primeiras 50
         pdfPages: pdfData.numpages,
