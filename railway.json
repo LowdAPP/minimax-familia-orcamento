@@ -4,7 +4,7 @@
     "builder": "DOCKERFILE",
     "dockerfile": "./Dockerfile",
     "buildArgs": {
-      "BUILD_TIME": "2025-11-13T16:43:00Z"
+      "BUILD_TIME": "2025-11-13T17:20:00Z"
     }
   },
   "deploy": {
