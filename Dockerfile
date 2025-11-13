@@ -1,5 +1,8 @@
 FROM node:18-alpine
 
+LABEL maintainer="Familia Financas"
+LABEL description="PDF Parser Backend with PDF Processing"
+
 WORKDIR /app
 
 # Copy package files
