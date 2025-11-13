@@ -1,0 +1,19 @@
+EXTRATO BANCÁRIO - TESTE
+Data: 07/11/2025
+Conta: 12345-6
+Agência: 001
+
+MOVIMENTAÇÕES:
+
+01/11/2025 - SALÁRIO               + R$ 3.500,00
+02/11/2025 - SUPERMERCADO          - R$ 250,75
+03/11/2025 - GASOLINA              - R$ 120,00
+04/11/2025 - RESTAURANTE           - R$ 85,50
+05/11/2025 - FARMÁCIA              - R$ 45,20
+06/11/2025 - TRANSPORTE            - R$ 15,00
+07/11/2025 - ENERGIA ELÉTRICA      - R$ 180,90
+
+SALDO ANTERIOR: R$ 1.200,00
+SALDO ATUAL: R$ 4.002,65
+
+Este é um extrato de teste para validação do sistema de upload PDF.

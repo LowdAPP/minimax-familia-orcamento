@@ -1,0 +1,524 @@
+[
+  {
+    "date": "2025-10-31",
+    "description": "TRF. COBR DUC 105725010361571",
+    "amount": -176.63,
+    "merchant": "TRF. COBR DUC 105725010361571"
+  },
+  {
+    "date": "2025-10-31",
+    "description": "TRF.IMED. DE WALQUIRIA CASSIANO O ABRUN-R4695333",
+    "amount": 180,
+    "merchant": "TRF.IMED. DE WALQUIRIA CASSIANO O"
+  },
+  {
+    "date": "2025-10-31",
+    "description": "COMPRA ESTRANG*9708 UBER ONE",
+    "amount": -4.99,
+    "merchant": "COMPRA ESTRANG*9708 UBER ONE"
+  },
+  {
+    "date": "2025-10-30",
+    "description": "COMPRA ESTRANG*9708 Spotify P3BE7CA9AD",
+    "amount": -16.99,
+    "merchant": "COMPRA ESTRANG*9708 Spotify P3BE7CA9AD"
+  },
+  {
+    "date": "2025-10-28",
+    "description": "COMPRA ESTRANG*9708 UBER EATS PENDING",
+    "amount": -36.97,
+    "merchant": "COMPRA ESTRANG*9708 UBER EATS PENDING"
+  },
+  {
+    "date": "2025-10-28",
+    "description": "DÉBITO DIRETO-CULLIGAN PORTUGA-17001880853",
+    "amount": -28.7,
+    "merchant": "DÉBITO DIRETO-CULLIGAN PORTUGA-17001880853"
+  },
+  {
+    "date": "2025-10-27",
+    "description": "COMPRA ESTRANG*9708 BOLT.EU/O/2510251048",
+    "amount": -4.05,
+    "merchant": "COMPRA ESTRANG*9708 BOLT.EU/O/2510251048"
+  },
+  {
+    "date": "2025-10-27",
+    "description": "0.01-978-IMP.CPR. ESTR",
+    "amount": -0.01,
+    "merchant": "0.-IMP.CPR. ESTR"
+  },
+  {
+    "date": "2025-10-27",
+    "description": "0.36-978-COMISSAO CPR.",
+    "amount": -0.36,
+    "merchant": "0.-COMISSAO CPR."
+  },
+  {
+    "date": "2025-10-27",
+    "description": "COMPRA ESTRANG*9708 CLAUDE.AI SUBSCRIPTION",
+    "amount": -18,
+    "merchant": "COMPRA ESTRANG*9708 CLAUDE.AI SUBSCRIPTION"
+  },
+  {
+    "date": "2025-10-27",
+    "description": "0.09-978-COMISSAO CPR.",
+    "amount": -0.09,
+    "merchant": "0.-COMISSAO CPR."
+  },
+  {
+    "date": "2025-10-27",
+    "description": "COMPRA ESTRANG*9708 RAILWAY",
+    "amount": -4.32,
+    "merchant": "COMPRA ESTRANG*9708 RAILWAY"
+  },
+  {
+    "date": "2025-10-27",
+    "description": "COMISS. CAMBIO",
+    "amount": -0.04,
+    "merchant": "COMISS. CAMBIO"
+  },
+  {
+    "date": "2025-10-27",
+    "description": "COMPRA *9708 COVERFLEX",
+    "amount": -7.38,
+    "merchant": "COMPRA *9708 COVERFLEX"
+  },
+  {
+    "date": "2025-10-27",
+    "description": "COMPRA ESTRANG*9708 DNH GODADDY#3929129452",
+    "amount": -1.89,
+    "merchant": "COMPRA ESTRANG*9708 DNH GODADDY#3929129452"
+  },
+  {
+    "date": "2025-10-24",
+    "description": "COMPRA ESTRANG*9708 WWW_CONTABO_COM",
+    "amount": -4.58,
+    "merchant": "COMPRA ESTRANG*9708 WWW_CONTABO_COM"
+  },
+  {
+    "date": "2025-10-23",
+    "description": "0.01-978-IMP.CPR. ESTR",
+    "amount": -0.01,
+    "merchant": "0.-IMP.CPR. ESTR"
+  },
+  {
+    "date": "2025-10-23",
+    "description": "0.35-978-COMISSAO CPR.",
+    "amount": -0.35,
+    "merchant": "0.-COMISSAO CPR."
+  },
+  {
+    "date": "2025-10-23",
+    "description": "COMPRA ESTRANG*9708 VERCEL INC.",
+    "amount": -17.25,
+    "merchant": "COMPRA ESTRANG*9708 VERCEL INC."
+  },
+  {
+    "date": "2025-10-23",
+    "description": "IS (17.3.4) 4%",
+    "amount": -0.01,
+    "merchant": "IS (17.3.4) 4%"
+  },
+  {
+    "date": "2025-10-23",
+    "description": "COMISS. CAMBIO",
+    "amount": -0.17,
+    "merchant": "COMISS. CAMBIO"
+  },
+  {
+    "date": "2025-10-23",
+    "description": "DÉBITO DIRETO-SMAS DO MONTIJO-70800084337",
+    "amount": -34.83,
+    "merchant": "DÉBITO DIRETO-SMAS DO MONTIJO-70800084337"
+  },
+  {
+    "date": "2025-10-22",
+    "description": "TRF. COBR DUC 171525095041103",
+    "amount": -211.77,
+    "merchant": "TRF. COBR DUC 171525095041103"
+  },
+  {
+    "date": "2025-10-22",
+    "description": "TRF. COBR DUC 105825010147011",
+    "amount": -109.25,
+    "merchant": "TRF. COBR DUC 105825010147011"
+  },
+  {
+    "date": "2025-10-22",
+    "description": "0.01-978-IMP.CPR. ESTR",
+    "amount": -0.01,
+    "merchant": "0.-IMP.CPR. ESTR"
+  },
+  {
+    "date": "2025-10-22",
+    "description": "0.34-978-COMISSAO CPR.",
+    "amount": -0.34,
+    "merchant": "0.-COMISSAO CPR."
+  },
+  {
+    "date": "2025-10-22",
+    "description": "COMPRA ESTRANG*9708 CURSOR, AI POWERED IDE",
+    "amount": -17.17,
+    "merchant": "COMPRA ESTRANG*9708 CURSOR, AI POWERED"
+  },
+  {
+    "date": "2025-10-22",
+    "description": "IS (17.3.4) 4%",
+    "amount": -0.01,
+    "merchant": "IS (17.3.4) 4%"
+  },
+  {
+    "date": "2025-10-22",
+    "description": "COMISS. CAMBIO",
+    "amount": -0.17,
+    "merchant": "COMISS. CAMBIO"
+  },
+  {
+    "date": "2025-10-21",
+    "description": "Serviço de Limpeza-24023340",
+    "amount": -61.5,
+    "merchant": "Serviço de Limpeza-24023340"
+  },
+  {
+    "date": "2025-10-21",
+    "description": "0.01-978-IMP.CPR. ESTR",
+    "amount": -0.01,
+    "merchant": "0.-IMP.CPR. ESTR"
+  },
+  {
+    "date": "2025-10-21",
+    "description": "0.34-978-COMISSAO CPR.",
+    "amount": -0.34,
+    "merchant": "0.-COMISSAO CPR."
+  },
+  {
+    "date": "2025-10-21",
+    "description": "COMPRA ESTRANG*9708 CURSOR USAGE MID OCT",
+    "amount": -17.17,
+    "merchant": "COMPRA ESTRANG*9708 CURSOR USAGE MID"
+  },
+  {
+    "date": "2025-10-21",
+    "description": "IS (17.3.4) 4%",
+    "amount": -0.01,
+    "merchant": "IS (17.3.4) 4%"
+  },
+  {
+    "date": "2025-10-21",
+    "description": "COMISS. CAMBIO",
+    "amount": -0.17,
+    "merchant": "COMISS. CAMBIO"
+  },
+  {
+    "date": "2025-10-21",
+    "description": "COMPRA *9708 E005 Alverca do Ribate",
+    "amount": -38.75,
+    "merchant": "COMPRA *9708 E005 Alverca do"
+  },
+  {
+    "date": "2025-10-21",
+    "description": "COMPRA *9708 FOGAO GAUCHO ALVERCA",
+    "amount": -55.9,
+    "merchant": "COMPRA *9708 FOGAO GAUCHO ALVERCA"
+  },
+  {
+    "date": "2025-10-21",
+    "description": "COMPRA ESTRANG*9708 BOLT.EUO2510190927",
+    "amount": -3.64,
+    "merchant": "COMPRA ESTRANG*9708 BOLT.EUO2510190927"
+  },
+  {
+    "date": "2025-10-21",
+    "description": "DÉBITO DIRETO-GOLD ENERGY - CO-00598149",
+    "amount": -104.11,
+    "merchant": "DÉBITO DIRETO-GOLD ENERGY - CO-00598149"
+  },
+  {
+    "date": "2025-10-20",
+    "description": "Contabilidade-E1006751",
+    "amount": -196.8,
+    "merchant": "Contabilidade-E1006751"
+  },
+  {
+    "date": "2025-10-20",
+    "description": "TRF. COBR DUC 156080668917237",
+    "amount": -375,
+    "merchant": "TRF. COBR DUC 156080668917237"
+  },
+  {
+    "date": "2025-10-20",
+    "description": "TRANSFERENCIA - PAG. T.S.U.",
+    "amount": -284.95,
+    "merchant": "TRANSFERENCIA - PAG. T.S.U."
+  },
+  {
+    "date": "2025-10-20",
+    "description": "COMPRA *9708 MANOS GRILL",
+    "amount": -29.8,
+    "merchant": "COMPRA *9708 MANOS GRILL"
+  },
+  {
+    "date": "2025-10-20",
+    "description": "COMPRA ESTRANG*9708 UBER EATS",
+    "amount": -18.74,
+    "merchant": "COMPRA ESTRANG*9708 UBER EATS"
+  },
+  {
+    "date": "2025-10-15",
+    "description": "COMPRA ESTRANG*9708 UBER EATS PENDING",
+    "amount": -40.29,
+    "merchant": "COMPRA ESTRANG*9708 UBER EATS PENDING"
+  },
+  {
+    "date": "2025-10-14",
+    "description": "COMPRA ESTRANG*9708 UBER EATS PENDING",
+    "amount": -32.74,
+    "merchant": "COMPRA ESTRANG*9708 UBER EATS PENDING"
+  },
+  {
+    "date": "2025-10-14",
+    "description": "COMPRA *9708 MAC M PORTAS CID",
+    "amount": -7.5,
+    "merchant": "COMPRA *9708 MAC M PORTAS"
+  },
+  {
+    "date": "2025-10-13",
+    "description": "COM GESTAO:31.0003.18480359096",
+    "amount": -1.19,
+    "merchant": "COM GESTAO:480359096"
+  },
+  {
+    "date": "2025-10-13",
+    "description": "COB.REC.31.000318480359096/ 23",
+    "amount": -345.37,
+    "merchant": "COB.REC.0318480359096/ 23"
+  },
+  {
+    "date": "2025-10-13",
+    "description": "Contabilidade-E0993121",
+    "amount": -206.8,
+    "merchant": "Contabilidade-E0993121"
+  },
+  {
+    "date": "2025-10-13",
+    "description": "COMPRA ESTRANG*9708 BOLT.EUO2510111510",
+    "amount": -3.24,
+    "merchant": "COMPRA ESTRANG*9708 BOLT.EUO2510111510"
+  },
+  {
+    "date": "2025-10-13",
+    "description": "COMPRA *9708 SANDES MELHOR LEITAO",
+    "amount": -11,
+    "merchant": "COMPRA *9708 SANDES MELHOR LEITAO"
+  },
+  {
+    "date": "2025-10-13",
+    "description": "0.01-978-IMP.CPR. ESTR",
+    "amount": -0.01,
+    "merchant": "0.-IMP.CPR. ESTR"
+  },
+  {
+    "date": "2025-10-13",
+    "description": "0.17-978-COMISSAO CPR.",
+    "amount": -0.17,
+    "merchant": "0.-COMISSAO CPR."
+  },
+  {
+    "date": "2025-10-13",
+    "description": "COMPRA ESTRANG*9708 ABACUS.AI",
+    "amount": -8.62,
+    "merchant": "COMPRA ESTRANG*9708 ABACUS.AI"
+  },
+  {
+    "date": "2025-10-13",
+    "description": "COMISS. CAMBIO",
+    "amount": -0.09,
+    "merchant": "COMISS. CAMBIO"
+  },
+  {
+    "date": "2025-10-10",
+    "description": "COMPRA *9708 SERGIO ZANOTTI",
+    "amount": -42.5,
+    "merchant": "COMPRA *9708 SERGIO ZANOTTI"
+  },
+  {
+    "date": "2025-10-09",
+    "description": "0.01-978-IMP.CPR. ESTR",
+    "amount": -0.01,
+    "merchant": "0.-IMP.CPR. ESTR"
+  },
+  {
+    "date": "2025-10-09",
+    "description": "0.26-978-COMISSAO CPR.",
+    "amount": -0.26,
+    "merchant": "0.-COMISSAO CPR."
+  },
+  {
+    "date": "2025-10-09",
+    "description": "COMPRA ESTRANG*9708 CURSOR USAGE SEP",
+    "amount": -12.88,
+    "merchant": "COMPRA ESTRANG*9708 CURSOR USAGE SEP"
+  },
+  {
+    "date": "2025-10-09",
+    "description": "IS (17.3.4) 4%",
+    "amount": -0.01,
+    "merchant": "IS (17.3.4) 4%"
+  },
+  {
+    "date": "2025-10-09",
+    "description": "COMISS. CAMBIO",
+    "amount": -0.13,
+    "merchant": "COMISS. CAMBIO"
+  },
+  {
+    "date": "2025-10-09",
+    "description": "COMPRA ESTRANG*9708 AMAZON 7J2A85545",
+    "amount": -53,
+    "merchant": "COMPRA ESTRANG*9708 AMAZON 7J2A85545"
+  },
+  {
+    "date": "2025-10-08",
+    "description": "DÉBITO DIRETO-AEGON SANTANDER -71845847",
+    "amount": -30.56,
+    "merchant": "DÉBITO DIRETO-AEGON SANTANDER -71845847"
+  },
+  {
+    "date": "2025-10-07",
+    "description": "COMPRA *9708 SUSHI MEI",
+    "amount": -25.13,
+    "merchant": "COMPRA *9708 SUSHI MEI"
+  },
+  {
+    "date": "2025-10-07",
+    "description": "IS-VERBA 17.3.4 TGIS-S/COM",
+    "amount": -0.63,
+    "merchant": "IS-VERBA 17.3.4 TGIS-S/COM"
+  },
+  {
+    "date": "2025-10-07",
+    "description": "COMISSãO DE GESTãO",
+    "amount": -15.8,
+    "merchant": "COMISSãO DE GESTãO"
+  },
+  {
+    "date": "2025-10-06",
+    "description": "COMPRA *9708 McDonalds 35100184",
+    "amount": -43.7,
+    "merchant": "COMPRA *9708 McDonalds 35100184"
+  },
+  {
+    "date": "2025-10-06",
+    "description": "COMPRA ESTRANG*9708 AMAZON GY6050E75",
+    "amount": -6.65,
+    "merchant": "COMPRA ESTRANG*9708 AMAZON GY6050E75"
+  },
+  {
+    "date": "2025-10-06",
+    "description": "COMPRA *9708 WOW ACAI - O ORIGINA",
+    "amount": -33.3,
+    "merchant": "COMPRA *9708 WOW ACAI -"
+  },
+  {
+    "date": "2025-10-03",
+    "description": "0.02-978-IMP.CPR. ESTR",
+    "amount": -0.02,
+    "merchant": "0.-IMP.CPR. ESTR"
+  },
+  {
+    "date": "2025-10-03",
+    "description": "0.43-978-COMISSAO CPR.",
+    "amount": -0.43,
+    "merchant": "0.-COMISSAO CPR."
+  },
+  {
+    "date": "2025-10-03",
+    "description": "COMPRA ESTRANG*9708 VERCEL-SUPABASE",
+    "amount": -21.35,
+    "merchant": "COMPRA ESTRANG*9708 VERCEL-SUPABASE"
+  },
+  {
+    "date": "2025-10-03",
+    "description": "IS (17.3.4) 4%",
+    "amount": -0.01,
+    "merchant": "IS (17.3.4) 4%"
+  },
+  {
+    "date": "2025-10-03",
+    "description": "COMISS. CAMBIO",
+    "amount": -0.21,
+    "merchant": "COMISS. CAMBIO"
+  },
+  {
+    "date": "2025-10-03",
+    "description": "0.01-978-IMP.CPR. ESTR",
+    "amount": -0.01,
+    "merchant": "0.-IMP.CPR. ESTR"
+  },
+  {
+    "date": "2025-10-03",
+    "description": "0.34-978-COMISSAO CPR.",
+    "amount": -0.34,
+    "merchant": "0.-COMISSAO CPR."
+  },
+  {
+    "date": "2025-10-03",
+    "description": "COMPRA ESTRANG*9708 VERCEL INC.",
+    "amount": -17.08,
+    "merchant": "COMPRA ESTRANG*9708 VERCEL INC."
+  },
+  {
+    "date": "2025-10-03",
+    "description": "COMISS. CAMBIO",
+    "amount": -0.17,
+    "merchant": "COMISS. CAMBIO"
+  },
+  {
+    "date": "2025-10-03",
+    "description": "COMPRA ESTRANG*9708 GOOGLE GSUITE RESULTBA",
+    "amount": -12.15,
+    "merchant": "COMPRA ESTRANG*9708 GOOGLE GSUITE RESULTBA"
+  },
+  {
+    "date": "2025-10-03",
+    "description": "COMPRA *9708 RESTAURANTE MARRADAS",
+    "amount": -13.85,
+    "merchant": "COMPRA *9708 RESTAURANTE MARRADAS"
+  },
+  {
+    "date": "2025-10-02",
+    "description": "COMPRA ESTRANG*9708 GOOGLE GOOGLE ONE",
+    "amount": -9.99,
+    "merchant": "COMPRA ESTRANG*9708 GOOGLE GOOGLE ONE"
+  },
+  {
+    "date": "2025-10-01",
+    "description": "COMPRA ESTRANG*9708 UBER ONE",
+    "amount": -4.99,
+    "merchant": "COMPRA ESTRANG*9708 UBER ONE"
+  },
+  {
+    "date": "2025-10-01",
+    "description": "DÉBITO DIRETO-COMPANHIA DE SEG-00705088622",
+    "amount": -60.87,
+    "merchant": "DÉBITO DIRETO-COMPANHIA DE SEG-00705088622"
+  },
+  {
+    "date": "2025-10-01",
+    "description": "IMP. SELO CR. NÃO PRE-CONT",
+    "amount": -1.6,
+    "merchant": "IMP. SELO CR. NÃO PRE-CONT"
+  },
+  {
+    "date": "2025-10-01",
+    "description": "CR. NÃO PRE-CONT",
+    "amount": -39.95,
+    "merchant": "CR. NÃO PRE-CONT"
+  },
+  {
+    "date": "2025-10-01",
+    "description": "DÉBITO DIRETO-SMAS DO MONTIJO-70800084337",
+    "amount": -83.28,
+    "merchant": "DÉBITO DIRETO-SMAS DO MONTIJO-70800084337"
+  }
+]

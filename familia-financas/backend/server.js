@@ -9,12 +9,8 @@ const server = http.createServer((req, res) => {
 
   // Health check endpoint for Railway load balancer
   if (req.url === '/health' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      status: 'healthy',
-      timestamp: timestamp,
-      uptime: process.uptime()
-    }));
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('OK');
     return;
   }
 
@@ -43,7 +39,11 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`[${timestamp}] ✅ Server running on port ${PORT}`);
   console.log(`[${timestamp}] 🏥 Health check: GET /health`);
   console.log(`[${timestamp}] 📄 API: POST /api/process-pdf`);
+  console.log(`[${timestamp}] 🚀 Ready to accept requests!`);
 });
+
+// Prevent premature exits
+setInterval(() => {}, 1000);
 
 server.on('error', (error) => {
   console.error('[ERROR] Server error:', error);
