@@ -174,6 +174,18 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Supabase validation endpoint
+  if (req.url === '/health/supabase' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      supabaseConfigured: !!supabase,
+      supabaseUrl: supabaseUrl ? '✓ Set' : '✗ Missing',
+      supabaseKey: supabaseKey ? '✓ Set' : '✗ Missing',
+      timestamp: new Date().toISOString()
+    }));
+    return;
+  }
+
   // PDF processing endpoint - REAL IMPLEMENTATION
   if (req.url === '/api/process-pdf' && req.method === 'POST') {
     try {
