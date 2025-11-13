@@ -3,7 +3,20 @@
 const http = require('http');
 const querystring = require('querystring');
 const pdfParse = require('pdf-parse');
+const { createClient } = require('@supabase/supabase-js');
 const PORT = process.env.PORT || 3000;
+
+// Inicializar cliente Supabase
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
+let supabase = null;
+
+if (supabaseUrl && supabaseKey) {
+  supabase = createClient(supabaseUrl, supabaseKey);
+  console.log('[INIT] Supabase client initialized');
+} else {
+  console.log('[INIT] Supabase credentials not configured - database saving disabled');
+}
 
 // Função para extrair transações do texto do PDF
 function parseTransactions(text) {
@@ -114,6 +127,31 @@ function extractPdfFromMultipart(buffer, boundaryStr) {
   }
 }
 
+// Função para salvar transações no Supabase
+async function saveTransactionsToSupabase(transactions) {
+  if (!supabase) {
+    console.log('[DB] Supabase not configured, skipping database save');
+    return { success: false, reason: 'Supabase not configured' };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert(transactions);
+
+    if (error) {
+      console.error('[DB] Error saving to Supabase:', error);
+      return { success: false, reason: error.message };
+    }
+
+    console.log(`[DB] Successfully saved ${transactions.length} transactions to Supabase`);
+    return { success: true, saved: transactions.length };
+  } catch (err) {
+    console.error('[DB] Exception saving to Supabase:', err.message);
+    return { success: false, reason: err.message };
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ${req.method} ${req.url}`);
@@ -181,6 +219,12 @@ const server = http.createServer(async (req, res) => {
 
       console.log(`[${timestamp}] Found ${transactions.length} transactions`);
 
+      // Tenta salvar no banco de dados
+      let dbResult = { success: false, reason: 'Not attempted' };
+      if (supabase && transactions.length > 0) {
+        dbResult = await saveTransactionsToSupabase(transactions);
+      }
+
       // Retorna resultado
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
@@ -189,6 +233,7 @@ const server = http.createServer(async (req, res) => {
         transactionsFound: transactions.length,
         transactions: transactions.slice(0, 50), // Retorna primeiras 50
         pdfPages: pdfData.numpages,
+        databaseSave: dbResult,
         timestamp: timestamp
       }));
       return;
