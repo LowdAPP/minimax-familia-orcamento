@@ -13,9 +13,6 @@ RUN npm ci --only=production && npm list
 
 # Copy server code
 COPY familia-financas/backend/server.js .
-COPY familia-financas/backend/start.sh .
-
-RUN chmod +x start.sh
 
 EXPOSE 3000
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Deploy timestamp: 2025-11-13T21:10:00Z - REAL PDF PARSER WITH TRANSACTION EXTRACTION
-// Version: 1.0.1 - Production Ready
+// Deploy timestamp: 2025-11-13T21:18:00Z - REAL PDF PARSER WITH TRANSACTION EXTRACTION
+// Version: 1.0.2 - Simplified startup, removed start.sh dependency
 
 const http = require('http');
 const pdfParse = require('pdf-parse');
