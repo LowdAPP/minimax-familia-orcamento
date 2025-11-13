@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Deploy timestamp: 2025-11-13T20:55:00Z - Real PDF parser with transaction extraction
 
 const http = require('http');
 const querystring = require('querystring');
