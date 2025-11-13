@@ -2,7 +2,10 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "DOCKERFILE",
-    "dockerfile": "./Dockerfile"
+    "dockerfile": "./Dockerfile",
+    "buildArgs": {
+      "BUILD_TIME": "2025-11-13T16:43:00Z"
+    }
   },
   "deploy": {
     "restartPolicyType": "ON_FAILURE",
