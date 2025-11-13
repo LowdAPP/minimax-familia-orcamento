@@ -2,6 +2,10 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+COPY familia-financas/backend/package*.json ./
+
+RUN npm ci --only=production
+
 COPY familia-financas/backend/ .
 
 EXPOSE 3000
