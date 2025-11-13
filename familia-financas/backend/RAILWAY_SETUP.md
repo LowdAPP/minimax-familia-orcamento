@@ -1,139 +1,69 @@
-# Railway Deployment Setup Guide
+# 🚂 Setup Railway - Passo a Passo
 
-Este guia descreve como fazer o deploy do backend no Railway com as melhores práticas de 2024/2025.
+## ✅ O que foi configurado
 
-## ✅ O Que Está Pronto
+1. **railway.json** na raiz do projeto:
+   - Builder: `NIXPACKS`
+   - Start Command: `node server.js`
 
-- **server.js**: Servidor Node.js minimalista e eficiente
-- **Dockerfile**: Otimizado para Railway
-- **railway.json**: Configuração automatizada
-- **start.sh**: Script de inicialização que garante PORT
+2. **nixpacks.toml** em `familia-financas/backend/`:
+   - Node.js 18
+   - npm install
 
-## 🚀 Passo a Passo de Deploy
+3. **Procfile** em `familia-financas/backend/`:
+   - `web: node server.js`
 
-### 1. Primeira Configuração no Railway Dashboard
+## 📋 Configurações no Railway Dashboard
 
-1. Acesse [https://railway.com/project/25fcb98b-2af7-4f27-b4a4-1d58fda51579](https://railway.com/project/25fcb98b-2af7-4f27-b4a4-1d58fda51579)
+### 1. Root Directory
+**IMPORTANTE:** Configurar como `familia-financas/backend`
 
-2. Selecione o serviço **minimax-familia-orcamento**
+Como fazer:
+1. Vá em Settings do serviço
+2. Procure "Root Directory"
+3. Digite: `familia-financas/backend`
+4. Salve
 
-3. Vá até a aba **Variables**
+### 2. Builder
+✅ **Já configurado no railway.json como NIXPACKS**
+- Não precisa alterar manualmente
+- O Railway vai ler do `railway.json`
 
-4. Clique em **New Variable** e adicione:
+### 3. Variáveis de Ambiente
+Configurar no Railway:
+- `SUPABASE_URL` = URL do seu projeto Supabase
+- `SUPABASE_ANON_KEY` = Chave anônima do Supabase
+- `PORT` = Deixar Railway definir automaticamente (ou `3000`)
 
+### 4. Port
+**Target Port:** `3000`
+
+## 🔄 Após fazer push
+
+1. O Railway vai detectar o `railway.json` e usar Nixpacks
+2. Vai procurar o código em `familia-financas/backend/`
+3. Vai instalar dependências com `npm install`
+4. Vai iniciar com `node server.js`
+
+## ✅ Verificar se funcionou
+
+1. **Health Check:**
+   ```bash
+   curl https://seu-projeto.up.railway.app/health
    ```
-   Name: PORT
-   Value: 3000
-   ```
+   Deve retornar: `{"status":"ok",...}`
 
-5. Também adicione as variáveis Supabase:
+2. **Logs do Railway:**
+   - Deve aparecer: `✅ Servidor rodando na porta...`
+   - Não deve ter erros de "package.json not found"
 
-   ```
-   Name: SUPABASE_URL
-   Value: https://qkmuypctpuyoouqfatjf.supabase.co
+## 🐛 Problemas Comuns
 
-   Name: SUPABASE_SERVICE_ROLE_KEY
-   Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-   ```
+### "package.json not found"
+- **Solução:** Verificar se Root Directory está como `familia-financas/backend`
 
-### 2. Configurar Health Check
+### "Builder não muda"
+- **Solução:** O `railway.json` já está configurado. Fazer push e o Railway vai usar Nixpacks automaticamente
 
-1. Na aba **Settings** do serviço
-2. Procure por **Healthcheck**
-3. Adicione:
-   - **Path**: `/health`
-   - **Method**: `GET`
-   - **Initial Delay**: 5 segundos
-   - **Interval**: 30 segundos
-
-### 3. Deploy Automático via GitHub
-
-O deploy automático está habilitado. Sempre que você fazer push para a branch principal:
-
-```bash
-git push origin main
-```
-
-Railway vai:
-1. Clonar o repositório
-2. Fazer build do Dockerfile
-3. Iniciar o container
-4. Verificar health check
-5. Rotear tráfego
-
-## 📊 Verificando o Deploy
-
-### Health Check Local
-
-```bash
-PORT=3000 npm start
-curl http://localhost:3000/health
-```
-
-**Resposta esperada:**
-```json
-{
-  "status": "healthy",
-  "timestamp": "2025-11-13T10:30:45.123Z",
-  "uptime": 1.5
-}
-```
-
-### Health Check em Produção
-
-```bash
-curl https://minimax-familia-orcamento-production.up.railway.app/health
-```
-
-### Logs no Railway
-
-```bash
-railway logs
-```
-
-## 🔧 Troubleshooting
-
-### Erro 502 Bad Gateway
-
-**Causa:** PORT não definida ou servidor não respondendo
-
-**Solução:**
-1. Verifique se PORT=3000 está nas Variables
-2. Revise a aba Logs para erros de inicialização
-3. Teste localmente com `PORT=3000 npm start`
-
-### Health Check Falhando
-
-**Causa:** Servidor demora muito para iniciar ou endpoint /health com erro
-
-**Solução:**
-1. Aumente Initial Delay para 10 segundos
-2. Verifique `server.js` - health check precisa responder com status 200
-
-### Container Restartando
-
-**Causa:** Aplicação crashando
-
-**Solução:**
-1. Verifique Railway Logs
-2. Procure por erros de PORT binding
-3. Confirme que todas as variáveis estão definidas
-
-## 📈 Próximos Passos
-
-- [ ] Implementar rate limiting
-- [ ] Adicionar compressão de respostas
-- [ ] Configurar CORS para domínio do frontend
-- [ ] Implementar PDF parsing real
-- [ ] Adicionar autenticação via Supabase JWT
-- [ ] Configurar Prometheus para métricas
-
-## 🔗 Referências
-
-- [Railway Docs - Variables](https://docs.railway.com/guides/variables)
-- [Railway Docs - Deploy Node.js API](https://docs.railway.com/guides/deploy-node-express-api-with-auto-scaling-secrets-and-zero-downtime)
-- [Server.js Health Check Implementation](./server.js)
-
----
-
-**Última atualização:** 13 de Novembro de 2025
+### "Connection refused"
+- **Solução:** Verificar logs do Railway para ver erros de inicialização
