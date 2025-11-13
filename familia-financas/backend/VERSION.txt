@@ -1,0 +1,3 @@
+# Version 1.0.3 - Real PDF Parser Deployment
+# Timestamp: 2025-11-13T21:32:00Z
+# Status: Ready for production with full transaction extraction
