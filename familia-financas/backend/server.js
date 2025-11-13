@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// Deploy timestamp: 2025-11-13T20:55:00Z - Real PDF parser with transaction extraction
+// Deploy timestamp: 2025-11-13T21:10:00Z - REAL PDF PARSER WITH TRANSACTION EXTRACTION
+// Version: 1.0.1 - Production Ready
 
 const http = require('http');
-const querystring = require('querystring');
 const pdfParse = require('pdf-parse');
 const PORT = process.env.PORT || 3000;
 
