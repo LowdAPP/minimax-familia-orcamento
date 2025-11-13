@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 const http = require('http');
-const querystring = require('querystring');
 const pdfParse = require('pdf-parse');
 const { createClient } = require('@supabase/supabase-js');
 const PORT = process.env.PORT || 3000;
@@ -13,142 +12,396 @@ let supabase = null;
 
 if (supabaseUrl && supabaseKey) {
   supabase = createClient(supabaseUrl, supabaseKey);
-  console.log('[INIT] Supabase client initialized');
+  console.log('[INIT] ✅ Supabase client initialized');
 } else {
-  console.log('[INIT] Supabase credentials not configured - database saving disabled');
+  console.log('[INIT] ⚠️ Supabase credentials not configured - database saving disabled');
+}
+
+// Função para parsear multipart/form-data
+function parseMultipartFormData(buffer, boundary) {
+  const parts = {};
+  const boundaryBuffer = Buffer.from('--' + boundary);
+  const partsArray = buffer.split(boundaryBuffer);
+  
+  for (let i = 1; i < partsArray.length - 1; i++) {
+    const part = partsArray[i];
+    const headerEnd = part.indexOf('\r\n\r\n');
+    if (headerEnd === -1) continue;
+    
+    const headers = part.slice(0, headerEnd).toString();
+    const body = part.slice(headerEnd + 4);
+    
+    // Extrai o nome do campo do header
+    const nameMatch = headers.match(/name="([^"]+)"/);
+    if (!nameMatch) continue;
+    
+    const fieldName = nameMatch[1];
+    
+    // Verifica se é um arquivo
+    const filenameMatch = headers.match(/filename="([^"]+)"/);
+    if (filenameMatch) {
+      // É um arquivo
+      parts[fieldName] = {
+        filename: filenameMatch[1],
+        data: body.slice(0, body.length - 2) // Remove \r\n final
+      };
+    } else {
+      // É um campo de texto
+      parts[fieldName] = body.slice(0, body.length - 2).toString().trim(); // Remove \r\n final
+    }
+  }
+  
+  return parts;
+}
+
+// Função para parsear data no formato DD/MM/YYYY ou DD-MM-YYYY
+function parseDate(dateStr) {
+  if (!dateStr) return null;
+  
+  // Remove espaços e caracteres especiais
+  dateStr = dateStr.trim().replace(/\s+/g, '');
+  
+  // Tenta DD/MM/YYYY ou DD-MM-YYYY
+  const match = dateStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if (!match) return null;
+  
+  let day = parseInt(match[1], 10);
+  let month = parseInt(match[2], 10);
+  let year = parseInt(match[3], 10);
+  
+  // Ajusta ano de 2 dígitos
+  if (year < 100) {
+    year = year < 50 ? 2000 + year : 1900 + year;
+  }
+  
+  // Valida data
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  
+  // Formata como YYYY-MM-DD para DATE do PostgreSQL
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+// Função para parsear valor monetário
+function parseAmount(amountStr) {
+  if (!amountStr) return null;
+  
+  // Remove espaços e caracteres especiais, exceto números, vírgula e ponto
+  let cleaned = amountStr.toString().trim().replace(/[^\d,.-]/g, '');
+  
+  // Se tem vírgula e ponto, assume formato brasileiro: 1.234,56
+  if (cleaned.includes(',') && cleaned.includes('.')) {
+    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+  } else if (cleaned.includes(',')) {
+    // Só vírgula: pode ser 1234,56 ou 1,234 (assume decimal)
+    if (cleaned.split(',')[1]?.length === 2) {
+      cleaned = cleaned.replace(',', '.');
+    } else {
+      cleaned = cleaned.replace(',', '');
+    }
+  }
+  
+  const value = parseFloat(cleaned);
+  return isNaN(value) ? null : Math.abs(value);
+}
+
+// Função para extrair merchant da descrição
+function extractMerchant(description) {
+  if (!description) return null;
+  
+  // Remove caracteres especiais e espaços extras
+  const cleaned = description.trim().replace(/\s+/g, ' ');
+  
+  // Tenta extrair nome do estabelecimento (primeiras palavras)
+  const words = cleaned.split(' ');
+  if (words.length > 0) {
+    // Retorna primeiras 2-3 palavras como merchant
+    return words.slice(0, 3).join(' ').substring(0, 200);
+  }
+  
+  return cleaned.substring(0, 200);
 }
 
 // Função para extrair transações do texto do PDF
-function parseTransactions(text) {
+function parseTransactionsFromText(text, userId, accountId) {
   const transactions = [];
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-  const lines = text.split('\n');
+  console.log(`[PARSE] 📄 Analisando ${lines.length} linhas de texto...`);
+  console.log(`[PARSE] 📝 Primeiras 5 linhas:`, lines.slice(0, 5));
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.length < 20) continue;
+  // Múltiplos padrões para diferentes formatos de extrato
+  const patterns = [
+    {
+      name: 'Santander PT - Data Duplicada',
+      // DD-MM-YYYY DD-MM-YYYY Descrição Valor EUR Saldo EUR
+      regex: /(\d{2}-\d{2}-\d{4})\s+(\d{2}-\d{2}-\d{4})\s+(.+?)\s+([\+\-]?\s*\d{1,3}(?:\.\d{3})*,\d{2})\s*EUR/gi
+    },
+    {
+      name: 'Formato com Data Duplicada e Barra',
+      // DD/MM/YYYY DD/MM/YYYY Descrição Valor EUR
+      regex: /(\d{2}\/\d{2}\/\d{4})\s+(\d{2}\/\d{2}\/\d{4})\s+(.+?)\s+([\+\-]?\s*\d{1,3}(?:\.\d{3})*,\d{2})\s*EUR/gi
+    },
+    {
+      name: 'Formato Simples - Data Descrição Valor',
+      // DD/MM/YYYY ou DD-MM-YYYY Descrição Valor EUR
+      regex: /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s+(.+?)\s+([\+\-]?\s*\d{1,10}(?:[.,]\d{3})*[.,]\d{2})\s*(?:EUR|€)/gi
+    },
+    {
+      name: 'Formato Tabela',
+      // Data | Descrição | Valor
+      regex: /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s*[|\t]\s*(.+?)\s*[|\t]\s*([\+\-]?\s*\d{1,10}(?:[.,]\d{3})*[.,]\d{2})/gi
+    }
+  ];
 
-    // Padrão 1: DD-MM-YYYY DD-MM-YYYY descrição valor EUR saldo EUR
-    // Exemplo: "06-11-202506-11-2025Vercel Mkt Supabase-27,68 EUR-1.280,41 EUR"
-    const datePattern1 = /(\d{2})-(\d{2})-(\d{4})/;
-    const dateMatch = trimmed.match(datePattern1);
+  // Tenta cada padrão
+  for (const pattern of patterns) {
+    console.log(`[PARSE] 🔍 Tentando padrão: ${pattern.name}`);
+    const textToSearch = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    let matchCount = 0;
 
-    if (!dateMatch) continue;
+    for (const match of textToSearch.matchAll(pattern.regex)) {
+      matchCount++;
+      try {
+        let dateStr, description, amountStr;
 
-    // Procura por valores em EUR ou R$
-    const valueMatch = trimmed.match(/([-]?\d+[.,]\d{2})\s*(EUR|R\$)/);
-    if (!valueMatch) continue;
+        if (pattern.name.includes('Duplicada')) {
+          // Formato com data duplicada: usa primeira data
+          dateStr = match[1];
+          description = match[3];
+          amountStr = match[4];
+        } else {
+          // Formato simples
+          dateStr = match[1];
+          description = match[2];
+          amountStr = match[3];
+        }
 
-    // Extrai a descrição (entre primeira data e o valor)
-    const dateStr = dateMatch[0];
-    const dateIdx = trimmed.indexOf(dateStr);
+        const transactionDate = parseDate(dateStr);
+        if (!transactionDate) {
+          console.log(`[PARSE] ⚠️ Data inválida: ${dateStr}`);
+          continue;
+        }
 
-    // Remove as duas datas do início (operação e data)
-    let withoutDates = trimmed;
-    let firstDateIdx = withoutDates.indexOf(dateStr);
-    if (firstDateIdx !== -1) {
-      withoutDates = withoutDates.substring(firstDateIdx + dateStr.length);
-      // Remove segunda data se existir
-      let secondDateMatch = withoutDates.match(datePattern1);
-      if (secondDateMatch) {
-        let secondDateIdx = withoutDates.indexOf(secondDateMatch[0]);
-        withoutDates = withoutDates.substring(secondDateIdx + secondDateMatch[0].length);
+        // Parse do valor
+        const amountValue = parseAmount(amountStr);
+        if (!amountValue || amountValue < 0.01) {
+          console.log(`[PARSE] ⚠️ Valor inválido: ${amountStr}`);
+          continue;
+        }
+
+        // Determina sinal (se não tem sinal explícito, assume negativo para despesas)
+        let amount = amountValue;
+        if (amountStr.trim().startsWith('+')) {
+          amount = amountValue;
+        } else if (amountStr.trim().startsWith('-')) {
+          amount = -amountValue;
+        } else {
+          // Se não tem sinal, assume negativo (despesa)
+          amount = -amountValue;
+        }
+
+        // Limpa descrição
+        description = description
+          .trim()
+          .replace(/\s+/g, ' ')
+          .replace(/[|\t]/g, ' ')
+          .replace(/(?:EUR|€|R\$|\$|USD)\d+[.,]\d+(?:EUR|€|R\$|\$|USD)?/g, '')
+          .trim();
+
+        // Validações
+        if (description.length < 3 || description.length > 500) {
+          console.log(`[PARSE] ⚠️ Descrição muito curta/longa: ${description.substring(0, 50)}`);
+          continue;
+        }
+
+        if (/^[\d\s\.\,\-\/\+€\$£EURR\$USD]+$/.test(description)) {
+          console.log(`[PARSE] ⚠️ Descrição só tem números: ${description}`);
+          continue;
+        }
+
+        const lowerDesc = description.toLowerCase();
+        if (lowerDesc.includes('disponível') || 
+            lowerDesc.includes('autorizado') ||
+            lowerDesc.includes('saldo contabilístico') ||
+            lowerDesc.includes('data') && lowerDesc.includes('tipo')) {
+          continue;
+        }
+
+        // Verifica duplicatas
+        const isDuplicate = transactions.some(t =>
+          t.transaction_date === transactionDate &&
+          Math.abs(t.amount - amount) < 0.01 &&
+          t.description === description
+        );
+
+        if (!isDuplicate) {
+          console.log(`[PARSE] ✅ Transação encontrada: ${transactionDate} | ${description.substring(0, 40)} | ${amount}`);
+          transactions.push({
+            user_id: userId,
+            account_id: accountId,
+            transaction_date: transactionDate,
+            amount: amount,
+            description: description,
+            merchant: extractMerchant(description),
+            transaction_type: amount > 0 ? 'receita' : 'despesa',
+            status: 'confirmed',
+            source: 'pdf_import'
+          });
+        }
+      } catch (error) {
+        console.log(`[PARSE] ❌ Erro ao processar match:`, error.message);
+        continue;
       }
     }
 
-    // Extrai descrição (tudo até o valor)
-    let description = '';
-    const valueIdx = withoutDates.search(/[-]?\d+[.,]\d{2}\s*EUR/);
-    if (valueIdx !== -1) {
-      description = withoutDates.substring(0, valueIdx).trim();
-    }
-
-    if (!description) continue;
-
-    // Converte valor
-    const valueStr = valueMatch[1];
-    const value = Math.abs(parseFloat(valueStr.replace(/\./g, '').replace(',', '.')));
-
-    if (!isNaN(value) && value > 0) {
-      // Determina tipo (débito vs crédito)
-      const isDebit = trimmed.substring(0, trimmed.indexOf(valueMatch[0])).match(/[-]/);
-
-      transactions.push({
-        date: `${dateMatch[1]}/${dateMatch[2]}/${dateMatch[3]}`,
-        description: description.substring(0, 100),
-        amount: value,
-        type: isDebit ? 'debit' : 'credit',
-        currency: valueMatch[2],
-        raw_line: trimmed.substring(0, 250)
-      });
+    console.log(`[PARSE] 📊 Padrão ${pattern.name}: ${matchCount} matches encontrados`);
+    
+    // Se encontrou transações com este padrão, para de tentar outros
+    if (transactions.length > 0) {
+      console.log(`[PARSE] ✅ Usando padrão ${pattern.name} - ${transactions.length} transações encontradas`);
+      break;
     }
   }
 
+  // Se não encontrou com padrões, tenta método linha por linha (fallback)
+  if (transactions.length === 0) {
+    console.log(`[PARSE] 🔄 Nenhuma transação encontrada com padrões, tentando método linha por linha...`);
+    
+    const datePattern = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/;
+    const amountPattern = /([\+\-]?)\s*(\d{1,10}(?:[.,]\d{3})*[.,]\d{2})\s*(?:EUR|€|R\$|\$|USD)?/gi;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const dateMatch = line.match(datePattern);
+      if (!dateMatch) continue;
+
+      if (line.includes('DataTipoDescritivo') || 
+          line.includes('Saldo contabilístico') ||
+          (line.includes('Data') && line.includes('Descrição') && line.includes('Valor'))) {
+        continue;
+      }
+
+      const dateStr = dateMatch[1];
+      const transactionDate = parseDate(dateStr);
+      if (!transactionDate) continue;
+
+      let description = '';
+      let amount = null;
+
+      const lineAfterDate = line.substring(line.indexOf(dateStr) + dateStr.length).trim();
+      const hasDescriptionInLine = lineAfterDate.length > 3 && 
+                                    !/^[\d\s\-EUR€R\$£\$USD]+$/.test(lineAfterDate);
+
+      if (hasDescriptionInLine) {
+        description = lineAfterDate;
+        const amountMatches = [...line.matchAll(amountPattern)];
+        if (amountMatches.length > 0) {
+          const amountMatch = amountMatches[0];
+          const sign = amountMatch[1] === '+' ? 1 : -1;
+          const value = parseAmount(amountMatch[2]);
+          if (value) {
+            amount = sign * value;
+            description = description.replace(amountMatch[0], '').trim();
+          }
+        } else if (i + 1 < lines.length) {
+          const nextLine = lines[i + 1];
+          const nextAmountMatches = [...nextLine.matchAll(amountPattern)];
+          if (nextAmountMatches.length > 0) {
+            const amountMatch = nextAmountMatches[0];
+            const sign = amountMatch[1] === '+' ? 1 : -1;
+            const value = parseAmount(amountMatch[2]);
+            if (value) {
+              amount = sign * value;
+            }
+          }
+        }
+      } else {
+        if (i + 1 < lines.length) {
+          const nextLine = lines[i + 1];
+          description = nextLine.trim();
+          
+          const nextAmountMatches = [...nextLine.matchAll(amountPattern)];
+          if (nextAmountMatches.length > 0) {
+            const amountMatch = nextAmountMatches[0];
+            const sign = amountMatch[1] === '+' ? 1 : -1;
+            const value = parseAmount(amountMatch[2]);
+            if (value) {
+              amount = sign * value;
+              description = description.replace(amountMatch[0], '').trim();
+            }
+          }
+        }
+      }
+
+      description = description
+        .replace(/\s+/g, ' ')
+        .replace(/[|\t]/g, ' ')
+        .replace(/(?:EUR|€|R\$|\$|USD)\d+[.,]\d+(?:EUR|€|R\$|\$|USD)?/g, '')
+        .trim();
+
+      if (!amount || isNaN(amount) || Math.abs(amount) < 0.01) continue;
+      if (description.length < 3 || description.length > 500) continue;
+      if (/^[\d\s\.\,\-\/\+€\$£EURR\$USD]+$/.test(description)) continue;
+
+      const lowerDesc = description.toLowerCase();
+      if (lowerDesc.includes('disponível') || lowerDesc.includes('autorizado')) continue;
+
+      const isDuplicate = transactions.some(t =>
+        t.transaction_date === transactionDate &&
+        Math.abs(t.amount - amount) < 0.01 &&
+        t.description === description
+      );
+
+      if (!isDuplicate) {
+        transactions.push({
+          user_id: userId,
+          account_id: accountId,
+          transaction_date: transactionDate,
+          amount: amount,
+          description: description,
+          merchant: extractMerchant(description),
+          transaction_type: amount > 0 ? 'receita' : 'despesa',
+          status: 'confirmed',
+          source: 'pdf_import'
+        });
+      }
+    }
+  }
+
+  console.log(`[PARSE] ✅ Total de ${transactions.length} transações parseadas`);
   return transactions;
-}
-
-// Função para processar arquivo multipart/form-data
-async function parseMultipartFormData(req) {
-  return new Promise((resolve, reject) => {
-    let data = Buffer.alloc(0);
-
-    req.on('data', chunk => {
-      data = Buffer.concat([data, chunk]);
-      // Limita tamanho a 50MB
-      if (data.length > 50 * 1024 * 1024) {
-        reject(new Error('File too large'));
-      }
-    });
-
-    req.on('end', () => {
-      resolve(data);
-    });
-
-    req.on('error', reject);
-  });
-}
-
-// Função para extrair arquivo PDF do multipart
-function extractPdfFromMultipart(buffer, boundaryStr) {
-  try {
-    const boundary = Buffer.from('--' + boundaryStr);
-    const startMarker = Buffer.from('filename=');
-    const pdfStart = buffer.indexOf(Buffer.from('\r\n\r\n'));
-
-    if (pdfStart === -1) return null;
-
-    // Procura pelo fim do boundary
-    const nextBoundary = buffer.indexOf(boundary, pdfStart + 4);
-    const pdfEnd = nextBoundary > -1 ? nextBoundary - 2 : buffer.length - 2;
-
-    return buffer.slice(pdfStart + 4, pdfEnd);
-  } catch (err) {
-    return null;
-  }
 }
 
 // Função para salvar transações no Supabase
 async function saveTransactionsToSupabase(transactions) {
   if (!supabase) {
-    console.log('[DB] Supabase not configured, skipping database save');
-    return { success: false, reason: 'Supabase not configured' };
+    console.log('[DB] ⚠️ Supabase not configured, skipping database save');
+    return { success: false, reason: 'Supabase not configured', inserted: 0 };
+  }
+
+  if (transactions.length === 0) {
+    return { success: true, inserted: 0, reason: 'No transactions to save' };
   }
 
   try {
+    console.log(`[DB] 💾 Tentando salvar ${transactions.length} transações...`);
+    
     const { data, error } = await supabase
       .from('transactions')
-      .insert(transactions);
+      .insert(transactions)
+      .select('id');
 
     if (error) {
-      console.error('[DB] Error saving to Supabase:', error);
-      return { success: false, reason: error.message };
+      console.error('[DB] ❌ Erro ao salvar no Supabase:', error);
+      return { success: false, reason: error.message, inserted: 0 };
     }
 
-    console.log(`[DB] Successfully saved ${transactions.length} transactions to Supabase`);
-    return { success: true, saved: transactions.length };
+    const insertedCount = data ? data.length : 0;
+    console.log(`[DB] ✅ ${insertedCount} transações salvas com sucesso!`);
+    return { success: true, inserted: insertedCount };
   } catch (err) {
-    console.error('[DB] Exception saving to Supabase:', err.message);
-    return { success: false, reason: err.message };
+    console.error('[DB] ❌ Exceção ao salvar no Supabase:', err.message);
+    return { success: false, reason: err.message, inserted: 0 };
   }
 }
 
@@ -169,81 +422,191 @@ const server = http.createServer(async (req, res) => {
 
   // Health check endpoint
   if (req.url === '/health' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('OK');
-    return;
-  }
-
-  // Supabase validation endpoint
-  if (req.url === '/health/supabase' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      supabaseConfigured: !!supabase,
-      supabaseUrl: supabaseUrl ? '✓ Set' : '✗ Missing',
-      supabaseKey: supabaseKey ? '✓ Set' : '✗ Missing',
-      timestamp: new Date().toISOString()
+      status: 'ok',
+      timestamp: timestamp,
+      service: 'pdf-processor-backend',
+      version: '1.0.0',
+      supabase: supabase ? 'configured' : 'not configured'
     }));
     return;
   }
 
-  // PDF processing endpoint - REAL IMPLEMENTATION
-  if (req.url === '/api/process-pdf' && req.method === 'POST') {
+  // Debug endpoint - extrai texto do PDF sem salvar
+  if (req.url === '/api/debug-pdf' && req.method === 'POST') {
     try {
       const contentType = req.headers['content-type'] || '';
-
-      // Extrai boundary do content-type
-      const boundaryMatch = contentType.match(/boundary=([^;]+)/);
-      const boundary = boundaryMatch ? boundaryMatch[1] : null;
-
-      // Lê o arquivo enviado
-      const buffer = await parseMultipartFormData(req);
-
-      let pdfBuffer = null;
-
-      if (boundary) {
-        // Extrai PDF do multipart form data
-        pdfBuffer = extractPdfFromMultipart(buffer, boundary);
-      } else if (buffer.length > 0) {
-        // Se não tiver boundary, assume que é o PDF direto
-        pdfBuffer = buffer;
-      }
-
-      if (!pdfBuffer || pdfBuffer.length === 0) {
+      
+      if (!contentType.includes('multipart/form-data')) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           success: false,
-          error: 'Arquivo PDF não encontrado',
-          timestamp: timestamp
+          error: 'Content-Type deve ser multipart/form-data'
         }));
         return;
       }
 
-      // Processa o PDF com pdf-parse
-      console.log(`[${timestamp}] Processing PDF (${pdfBuffer.length} bytes)...`);
+      const boundaryMatch = contentType.match(/boundary=([^;]+)/);
+      if (!boundaryMatch) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: false,
+          error: 'Boundary não encontrado'
+        }));
+        return;
+      }
 
+      const boundary = boundaryMatch[1].trim();
+      const buffer = await new Promise((resolve, reject) => {
+        let data = Buffer.alloc(0);
+        req.on('data', chunk => {
+          data = Buffer.concat([data, chunk]);
+          if (data.length > 50 * 1024 * 1024) {
+            reject(new Error('Arquivo muito grande'));
+          }
+        });
+        req.on('end', () => resolve(data));
+        req.on('error', reject);
+      });
+
+      const formData = parseMultipartFormData(buffer, boundary);
+      
+      if (!formData.file || !formData.file.data) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: false,
+          error: 'Arquivo PDF não encontrado'
+        }));
+        return;
+      }
+
+      const pdfData = await pdfParse(formData.file.data);
+      const text = pdfData.text;
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        pdfPages: pdfData.numpages,
+        textLength: text.length,
+        linesCount: lines.length,
+        firstLines: lines.slice(0, 20),
+        sampleText: text.substring(0, 2000), // Primeiros 2000 caracteres
+        timestamp: timestamp
+      }));
+      return;
+
+    } catch (error) {
+      console.error(`[${timestamp}] ❌ Erro no debug:`, error.message);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: false,
+        error: error.message
+      }));
+      return;
+    }
+  }
+
+  // PDF processing endpoint
+  if (req.url === '/api/process-pdf' && req.method === 'POST') {
+    try {
+      const contentType = req.headers['content-type'] || '';
+      
+      if (!contentType.includes('multipart/form-data')) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: false,
+          error: 'Content-Type deve ser multipart/form-data'
+        }));
+        return;
+      }
+
+      // Extrai boundary do content-type
+      const boundaryMatch = contentType.match(/boundary=([^;]+)/);
+      if (!boundaryMatch) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: false,
+          error: 'Boundary não encontrado no Content-Type'
+        }));
+        return;
+      }
+
+      const boundary = boundaryMatch[1].trim();
+
+      // Lê o body completo
+      const buffer = await new Promise((resolve, reject) => {
+        let data = Buffer.alloc(0);
+        req.on('data', chunk => {
+          data = Buffer.concat([data, chunk]);
+          if (data.length > 50 * 1024 * 1024) { // 50MB limit
+            reject(new Error('Arquivo muito grande (máximo 50MB)'));
+          }
+        });
+        req.on('end', () => resolve(data));
+        req.on('error', reject);
+      });
+
+      // Parse do multipart
+      const formData = parseMultipartFormData(buffer, boundary);
+
+      // Valida campos obrigatórios
+      if (!formData.file || !formData.file.data) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: false,
+          error: 'Arquivo PDF não encontrado no FormData'
+        }));
+        return;
+      }
+
+      if (!formData.user_id) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: false,
+          error: 'user_id não fornecido'
+        }));
+        return;
+      }
+
+      if (!formData.account_id) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: false,
+          error: 'account_id não fornecido'
+        }));
+        return;
+      }
+
+      const userId = formData.user_id;
+      const accountId = formData.account_id;
+      const pdfBuffer = formData.file.data;
+
+      console.log(`[${timestamp}] 📄 Processando PDF (${pdfBuffer.length} bytes) para user ${userId}, account ${accountId}...`);
+
+      // Processa o PDF
       const pdfData = await pdfParse(pdfBuffer);
       const text = pdfData.text;
 
-      console.log(`[${timestamp}] PDF parsed: ${pdfData.numpages} pages, ${text.length} chars`);
+      console.log(`[${timestamp}] 📖 PDF parseado: ${pdfData.numpages} páginas, ${text.length} caracteres`);
 
-      // Extrai transações do texto
-      const transactions = parseTransactions(text);
+      // Extrai transações
+      const transactions = parseTransactionsFromText(text, userId, accountId);
 
-      console.log(`[${timestamp}] Found ${transactions.length} transactions`);
+      console.log(`[${timestamp}] 💰 ${transactions.length} transações encontradas`);
 
-      // Tenta salvar no banco de dados
-      let dbResult = { success: false, reason: 'Not attempted' };
-      if (supabase && transactions.length > 0) {
-        dbResult = await saveTransactionsToSupabase(transactions);
-      }
+      // Salva no banco de dados
+      const dbResult = await saveTransactionsToSupabase(transactions);
 
-      // Retorna resultado
+      // Retorna resultado (formato compatível com frontend)
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         success: true,
         message: 'PDF processado com sucesso',
         transactionsFound: transactions.length,
-        transactions: transactions.slice(0, 50), // Retorna primeiras 50
+        transactionsInserted: dbResult.inserted || 0,
+        transactions: transactions.slice(0, 50), // Primeiras 50 para debug
         pdfPages: pdfData.numpages,
         databaseSave: dbResult,
         timestamp: timestamp
@@ -251,7 +614,8 @@ const server = http.createServer(async (req, res) => {
       return;
 
     } catch (error) {
-      console.error(`[${timestamp}] Error processing PDF:`, error.message);
+      console.error(`[${timestamp}] ❌ Erro ao processar PDF:`, error.message);
+      console.error(error.stack);
 
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
@@ -263,7 +627,7 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // 404 for unknown routes
+  // 404 para rotas desconhecidas
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({
     error: 'Not found',
@@ -274,26 +638,27 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, '0.0.0.0', () => {
   const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ✅ Server running on port ${PORT}`);
+  console.log(`[${timestamp}] ✅ Servidor rodando na porta ${PORT}`);
   console.log(`[${timestamp}] 🏥 Health check: GET /health`);
   console.log(`[${timestamp}] 📄 API: POST /api/process-pdf`);
-  console.log(`[${timestamp}] 🚀 Ready to accept requests!`);
-  console.log(`[${timestamp}] 📍 Environment PORT: ${process.env.PORT || 'not set'}`);
+  console.log(`[${timestamp}] 🚀 Pronto para receber requisições!`);
+  console.log(`[${timestamp}] 📍 PORT: ${process.env.PORT || 'não definido (usando 3000)'}`);
+  console.log(`[${timestamp}] 🔧 Supabase: ${supabase ? '✅ Configurado' : '❌ Não configurado'}`);
 });
 
-// Prevent premature exits
-setInterval(() => {}, 1000);
-
 server.on('error', (error) => {
-  console.error('[ERROR] Server error:', error);
+  console.error('[ERROR] ❌ Erro no servidor:', error);
+  if (error.code === 'EADDRINUSE') {
+    console.error(`⚠️ Porta ${PORT} já está em uso`);
+  }
   process.exit(1);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('[SIGTERM] Received SIGTERM, shutting down gracefully...');
+  console.log('[SIGTERM] 🛑 Recebido SIGTERM, encerrando servidor...');
   server.close(() => {
-    console.log('[SIGTERM] Server closed');
+    console.log('[SIGTERM] ✅ Servidor encerrado');
     process.exit(0);
   });
 });
