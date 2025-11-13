@@ -56,11 +56,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       if (error) throw error;
-      
+
       console.log('Perfil carregado:', data);
-      setProfile(data);
+
+      // Se não existir perfil, criar um padrão
+      if (!data) {
+        console.log('Nenhum perfil encontrado. Criando perfil padrão...');
+        const { data: newProfile, error: createError } = await supabase
+          .from('user_profiles')
+          .insert({
+            id: userId,
+            persona_type: 'iniciante_perdido',  // Valores válidos: 'iniciante_perdido', 'frustrado_anonimo', 'sem_tempo', 'gastador_impulsivo'
+            primary_goal: 'controlar_gastos',   // Valores válidos: 'fazer_sobrar', 'quitar_divida', 'criar_reserva', 'controlar_gastos'
+            onboarding_completed: false
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Erro ao criar perfil padrão:', createError);
+          throw createError;
+        }
+
+        console.log('Perfil padrão criado:', newProfile);
+        setProfile(newProfile);
+      } else {
+        setProfile(data);
+      }
     } catch (error) {
       console.error('Error loading profile:', error);
+      // Não fazer throw para não quebrar a autenticação
     } finally {
       if (setLoadingState) {
         setLoading(false);

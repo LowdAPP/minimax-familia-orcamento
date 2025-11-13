@@ -1,5 +1,6 @@
 // Página de Configurações
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useI18n } from '../hooks/useI18n';
 import { supabase } from '../lib/supabase';
@@ -17,7 +18,8 @@ import {
   Trash2,
   Check,
   Crown,
-  Sparkles
+  Sparkles,
+  RotateCcw
 } from 'lucide-react';
 
 interface Account {
@@ -38,7 +40,8 @@ interface AlertConfig {
 
 export default function SettingsPage() {
   const { user, profile, updateProfile, signOut } = useAuth();
-  const { t, setLanguage, language } = useI18n();
+  const { t, setLanguage, language, formatCurrency } = useI18n();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'accounts' | 'alerts' | 'subscription'>('profile');
   
@@ -73,10 +76,19 @@ export default function SettingsPage() {
   const [subscriptionStatus, setSubscriptionStatus] = useState<'active' | 'inactive' | 'trial'>('trial');
   const [subscriptionEndDate, setSubscriptionEndDate] = useState('');
 
+  // Onboarding data
+  const [initialBudget, setInitialBudget] = useState<{
+    total_income: number;
+    needs_amount: number;
+    wants_amount: number;
+    savings_amount: number;
+  } | null>(null);
+
   useEffect(() => {
     if (user) {
       loadAccounts();
       loadAlertConfig();
+      loadInitialBudget();
     }
   }, [user]);
 
@@ -87,6 +99,7 @@ export default function SettingsPage() {
       .from('accounts')
       .select('*')
       .eq('user_id', user.id)
+      .eq('is_active', true)
       .order('created_at', { ascending: false });
 
     setAccounts(data || []);
@@ -107,6 +120,28 @@ export default function SettingsPage() {
         bill_reminder: data.some(a => a.alert_type === 'bill_reminder'),
         unusual_spending: data.some(a => a.alert_type === 'unusual_spending'),
         savings_opportunity: data.some(a => a.alert_type === 'savings_opportunity')
+      });
+    }
+  };
+
+  const loadInitialBudget = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('budgets')
+      .select('total_income, needs_amount, wants_amount, savings_amount')
+      .eq('user_id', user.id)
+      .eq('budget_name', 'Orçamento Inicial')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (data && !error) {
+      setInitialBudget({
+        total_income: data.total_income || 0,
+        needs_amount: data.needs_amount || 0,
+        wants_amount: data.wants_amount || 0,
+        savings_amount: data.savings_amount || 0
       });
     }
   };
@@ -245,11 +280,24 @@ export default function SettingsPage() {
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value);
+  const getGoalLabel = (goal: string) => {
+    const goals: Record<string, string> = {
+      'fazer_sobrar': 'Fazer o dinheiro sobrar no fim do mês',
+      'quitar_divida': 'Quitar dívidas',
+      'criar_reserva': 'Criar reserva de emergência',
+      'controlar_gastos': 'Controlar gastos impulsivos'
+    };
+    return goals[goal] || goal;
+  };
+
+  const getPersonaLabel = (persona: string) => {
+    const personas: Record<string, { label: string; description: string }> = {
+      'iniciante_perdido': { label: 'Iniciante', description: 'Não sei por onde começar' },
+      'frustrado_anonimo': { label: 'Frustrado', description: 'Já tentei e não funcionou' },
+      'sem_tempo': { label: 'Sem Tempo', description: 'Preciso de algo rápido' },
+      'gastador_impulsivo': { label: 'Impulsivo', description: 'Tenho dificuldade em controlar' }
+    };
+    return personas[persona] || { label: persona, description: '' };
   };
 
   return (
@@ -405,6 +453,88 @@ export default function SettingsPage() {
                 Salvar Alterações
               </Button>
             </div>
+          </Card>
+
+          <Card>
+            <h3 className="text-h4 font-bold text-neutral-900 mb-md">Onboarding</h3>
+            
+            {profile?.onboarding_completed ? (
+              <div className="space-y-md mb-md">
+                <div className="bg-success-50 border border-success-200 rounded-base p-sm mb-md">
+                  <div className="flex items-center gap-sm">
+                    <Check className="w-5 h-5 text-success-600 flex-shrink-0" />
+                    <p className="text-body font-semibold text-success-900">
+                      Onboarding completado
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-sm">
+                  <div className="p-md bg-neutral-50 rounded-base">
+                    <p className="text-small font-medium text-neutral-600 mb-xs">Renda Mensal</p>
+                    <p className="text-h4 font-bold text-neutral-900">
+                      {formatCurrency(profile.monthly_income || 0)}
+                    </p>
+                  </div>
+
+                  <div className="p-md bg-neutral-50 rounded-base">
+                    <p className="text-small font-medium text-neutral-600 mb-xs">Meta Principal</p>
+                    <p className="text-body font-semibold text-neutral-900">
+                      {getGoalLabel(profile.primary_goal || 'controlar_gastos')}
+                    </p>
+                  </div>
+
+                  <div className="p-md bg-neutral-50 rounded-base">
+                    <p className="text-small font-medium text-neutral-600 mb-xs">Perfil</p>
+                    <p className="text-body font-semibold text-neutral-900 mb-xs">
+                      {getPersonaLabel(profile.persona_type || 'iniciante_perdido').label}
+                    </p>
+                    <p className="text-small text-neutral-600">
+                      {getPersonaLabel(profile.persona_type || 'iniciante_perdido').description}
+                    </p>
+                  </div>
+
+                  {initialBudget && (
+                    <div className="p-md bg-primary-50 border border-primary-200 rounded-base">
+                      <p className="text-small font-medium text-primary-700 mb-sm">Orçamento Inicial (50/30/20)</p>
+                      <div className="space-y-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="text-small text-neutral-600">Necessidades (50%)</span>
+                          <span className="text-body font-semibold text-neutral-900">
+                            {formatCurrency(initialBudget.needs_amount)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-small text-neutral-600">Desejos (30%)</span>
+                          <span className="text-body font-semibold text-neutral-900">
+                            {formatCurrency(initialBudget.wants_amount)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-small text-neutral-600">Poupança (20%)</span>
+                          <span className="text-body font-semibold text-neutral-900">
+                            {formatCurrency(initialBudget.savings_amount)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-body text-neutral-600 mb-md">
+                Complete o onboarding para personalizar sua experiência.
+              </p>
+            )}
+
+            <Button
+              variant="outline"
+              onClick={() => navigate('/onboarding?refazer=true')}
+              fullWidth
+            >
+              <RotateCcw className="w-4 h-4" />
+              {profile?.onboarding_completed ? 'Refazer Onboarding' : 'Iniciar Onboarding'}
+            </Button>
           </Card>
 
           <Card>

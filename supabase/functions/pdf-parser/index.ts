@@ -128,14 +128,27 @@ async function extractTextFromPDF(pdfBuffer: Uint8Array): Promise<string> {
         for (let pageNum = 1; pageNum <= numPages; pageNum++) {
             const page = await pdfDocument.getPage(pageNum);
             const textContent = await page.getTextContent();
-            
+
+            // Logs detalhados dos itens extraídos
+            console.log(`\n--- Página ${pageNum} ---`);
+            console.log(`Total de itens: ${textContent.items.length}`);
+
+            // Mostrar primeiros 20 itens para debug
+            textContent.items.slice(0, 20).forEach((item: any, idx: number) => {
+                console.log(`  Item ${idx}: "${item.str || ''}" (x:${item.transform?.[4]}, y:${item.transform?.[5]})`);
+            });
+
             // Concatenar todos os itens de texto
             const pageText = textContent.items
                 .map((item: any) => item.str || '')
                 .join(' ');
-            
+
             fullText += pageText + '\n';
         }
+
+        console.log('\n====== TEXTO EXTRAÍDO (primeiros 2000 chars) ======');
+        console.log(fullText.substring(0, 2000));
+        console.log('==================================================\n');
 
         return fullText;
     } catch (error) {
@@ -423,20 +436,34 @@ async function insertTransactionsToDatabase(transactions: Array<any>, userId: st
             // Primeiro, buscar ou criar categoria
             const category = await getOrCreateCategory(transaction.category, supabaseUrl, serviceRoleKey);
             
-            // Preparar dados da transação - CORRIGIDO: Adicionado account_id
+            // Preparar dados da transação com TODOS os campos obrigatórios
             const transactionData = {
                 user_id: userId,
-                account_id: account.id,  // ← CAMPO OBRIGATÓRIO ADICIONADO
+                account_id: account.id,
                 description: transaction.description,
-                amount: transaction.amount,
+                amount: parseFloat(Math.abs(transaction.amount).toFixed(2)),  // Sempre positivo no DB
                 transaction_type: transaction.amount < 0 ? 'despesa' : 'receita',
                 transaction_date: transaction.date,
                 category_id: category.id,
-                merchant: transaction.merchant,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
+                merchant: transaction.merchant || transaction.description.substring(0, 100),
+                status: 'pending',  // ← CAMPO OBRIGATÓRIO: status padrão
+                source: 'pdf_import'  // ← CAMPO OBRIGATÓRIO: origem
+                // created_at e updated_at são preenchidos automaticamente pelo banco
             };
             
+            // Log detalhado antes de inserir
+            console.log('Tentando inserir transação:', {
+                description: transaction.description,
+                amount: transactionData.amount,
+                transaction_type: transactionData.transaction_type,
+                transaction_date: transactionData.transaction_date,
+                status: transactionData.status,
+                source: transactionData.source,
+                user_id: transactionData.user_id,
+                account_id: transactionData.account_id,
+                category_id: transactionData.category_id
+            });
+
             // Inserir transação no Supabase
             const insertResponse = await fetch(`${supabaseUrl}/rest/v1/transactions`, {
                 method: 'POST',
@@ -448,14 +475,25 @@ async function insertTransactionsToDatabase(transactions: Array<any>, userId: st
                 },
                 body: JSON.stringify(transactionData)
             });
-            
+
             if (insertResponse.ok) {
                 const inserted = await insertResponse.json();
                 insertedTransactions.push(inserted[0] || transactionData);
-                console.log('Transação inserida:', transaction.description);
+                console.log('✓ Transação inserida com sucesso:', transaction.description);
             } else {
-                const error = await insertResponse.text();
-                console.error('Erro ao inserir transação:', error);
+                let errorMsg = 'Erro desconhecido';
+                try {
+                    const errorJson = await insertResponse.json();
+                    errorMsg = JSON.stringify(errorJson);
+                } catch (e) {
+                    errorMsg = await insertResponse.text();
+                }
+                console.error('❌ Erro ao inserir transação (HTTP ' + insertResponse.status + '):', {
+                    statusCode: insertResponse.status,
+                    statusText: insertResponse.statusText,
+                    error: errorMsg,
+                    transactionData: transactionData
+                });
             }
             
         } catch (error) {

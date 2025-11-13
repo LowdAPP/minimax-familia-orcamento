@@ -45,18 +45,18 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     <div className="min-h-screen bg-page">
       {/* Navigation Bar */}
       <nav className="sticky top-0 bg-white border-b border-neutral-200 shadow-sm z-50">
-        <div className="container mx-auto px-lg">
-          <div className="flex items-center justify-between h-16">
+        <div className="container mx-auto px-md">
+          <div className="flex items-center justify-between h-16 gap-sm">
             {/* Logo */}
-            <Link to="/dashboard" className="flex items-center gap-xs">
-              <TrendingUp className="w-8 h-8 text-primary-500" />
-              <span className="text-body-large font-semibold text-neutral-900 hidden sm:block">
+            <Link to="/dashboard" className="flex items-center gap-xs flex-shrink-0">
+              <TrendingUp className="w-7 h-7 text-primary-500" />
+              <span className="text-body-large font-semibold text-neutral-900 hidden lg:block">
                 FamíliaFinanças
               </span>
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-sm">
+            <div className="hidden md:flex items-center gap-1 flex-1 justify-center min-w-0">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
@@ -65,32 +65,32 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     key={item.path}
                     to={item.path}
                     className={`
-                      flex items-center gap-xs px-md py-sm rounded-base text-body font-medium
+                      flex items-center gap-1 rounded-base text-body font-medium whitespace-nowrap
                       transition-colors duration-fast
                       ${isActive 
-                        ? 'text-primary-500 bg-primary-50' 
-                        : 'text-neutral-700 hover:text-primary-500 hover:bg-neutral-50'
+                        ? 'text-primary-500 bg-primary-50 px-2 py-1' 
+                        : 'text-neutral-700 hover:text-primary-500 hover:bg-neutral-50 px-2 py-1'
                       }
                     `}
                   >
-                    <Icon className="w-5 h-5" />
-                    <span>{item.label}</span>
+                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <span className="hidden lg:inline">{item.label}</span>
                   </Link>
                 );
               })}
             </div>
 
             {/* User Menu */}
-            <div className="hidden md:flex items-center gap-sm">
-              <span className="text-small text-neutral-500">
+            <div className="hidden md:flex items-center gap-1 flex-shrink-0">
+              <span className="text-small text-neutral-500 whitespace-nowrap hidden xl:inline">
                 {profile?.persona_type ? profile.persona_type.replace('_', ' ') : 'Usuário'}
               </span>
               <button
                 onClick={handleSignOut}
-                className="flex items-center gap-xs px-md py-sm text-body text-neutral-700 hover:text-error-500 hover:bg-error-50 rounded-base transition-colors"
+                className="flex items-center gap-1 px-2 py-1 text-body text-neutral-700 hover:text-error-500 hover:bg-error-50 rounded-base transition-colors whitespace-nowrap"
               >
-                <LogOut className="w-5 h-5" />
-                <span>Sair</span>
+                <LogOut className="w-4 h-4" />
+                <span className="hidden lg:inline">Sair</span>
               </button>
             </div>
 
@@ -106,8 +106,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-neutral-200 bg-white">
-            <div className="container mx-auto px-lg py-md space-y-xs">
+          <div className="md:hidden border-t border-neutral-200 bg-white max-h-[calc(100vh-5rem)] overflow-y-auto overscroll-contain">
+            <div className="container mx-auto px-lg py-sm space-y-xs pb-sm">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
@@ -117,10 +117,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     to={item.path}
                     onClick={() => setMobileMenuOpen(false)}
                     className={`
-                      flex items-center gap-xs px-md py-sm rounded-base text-body font-medium
+                      flex items-center gap-xs rounded-base text-body font-medium
                       ${isActive 
-                        ? 'text-primary-500 bg-primary-50' 
-                        : 'text-neutral-700 hover:bg-neutral-50'
+                        ? 'text-primary-500 bg-primary-50 px-sm py-xs' 
+                        : 'text-neutral-700 hover:bg-neutral-50 px-md py-sm'
                       }
                     `}
                   >

@@ -104,29 +104,37 @@ export default function DashboardPage() {
     const endDate = `${currentMonth}-${String(lastDay).padStart(2, '0')}`;
 
     // Carregar contas
-    const { data: accounts } = await supabase
+    const { data: accounts, error: accountsError } = await supabase
       .from('accounts')
       .select('current_balance')
       .eq('user_id', user.id)
       .eq('is_active', true);
 
-    const totalBalance = accounts?.reduce((sum, acc) => sum + acc.current_balance, 0) || 0;
+    if (accountsError) {
+      console.error('Erro ao carregar contas:', accountsError);
+    }
+
+    const totalBalance = accounts?.reduce((sum, acc) => sum + (acc.current_balance || 0), 0) || 0;
 
     // Carregar transações do mês
-    const { data: transactions } = await supabase
+    const { data: transactions, error: transactionsError } = await supabase
       .from('transactions')
       .select('amount, transaction_type')
       .eq('user_id', user.id)
       .gte('transaction_date', `${currentMonth}-01`)
-      .lt('transaction_date', endDate);
+      .lte('transaction_date', endDate);
+
+    if (transactionsError) {
+      console.error('Erro ao carregar transações:', transactionsError);
+    }
 
     const monthlyIncome = transactions
       ?.filter(t => t.transaction_type === 'receita')
-      .reduce((sum, t) => sum + t.amount, 0) || profile?.monthly_income || 0;
+      .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
 
     const monthlyExpenses = transactions
       ?.filter(t => t.transaction_type === 'despesa')
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0) || 0;
+      .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0) || 0;
 
     setStats({
       totalBalance,
@@ -144,7 +152,7 @@ export default function DashboardPage() {
     const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
     const endDate = `${currentMonth}-${String(lastDay).padStart(2, '0')}`;
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('transactions')
       .select(`
         amount,
@@ -153,16 +161,16 @@ export default function DashboardPage() {
       .eq('user_id', user.id)
       .eq('transaction_type', 'despesa')
       .gte('transaction_date', `${currentMonth}-01`)
-      .lt('transaction_date', endDate);
+      .lte('transaction_date', endDate);
+
+    if (error) {
+      console.error('Erro ao carregar despesas por categoria:', error);
+      setCategoryExpenses([]);
+      return;
+    }
 
     if (!data || data.length === 0) {
-      // Dados mock para demonstração
-      setCategoryExpenses([
-        { name: 'Alimentação', value: 800, color: '#0066FF' },
-        { name: 'Moradia', value: 1200, color: '#00C853' },
-        { name: 'Transporte', value: 400, color: '#FF6B00' },
-        { name: 'Lazer', value: 300, color: '#FFD600' }
-      ]);
+      setCategoryExpenses([]);
       return;
     }
 
@@ -186,7 +194,7 @@ export default function DashboardPage() {
   const loadRecentTransactions = async () => {
     if (!user) return;
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('transactions')
       .select(`
         id,
@@ -200,26 +208,14 @@ export default function DashboardPage() {
       .order('transaction_date', { ascending: false })
       .limit(5);
 
+    if (error) {
+      console.error('Erro ao carregar transações recentes:', error);
+      setRecentTransactions([]);
+      return;
+    }
+
     if (!data || data.length === 0) {
-      // Dados mock para demonstração
-      setRecentTransactions([
-        {
-          id: '1',
-          description: 'Salário mensal',
-          amount: 3500,
-          transaction_type: 'receita',
-          transaction_date: new Date().toISOString(),
-          category_name: 'Salário'
-        },
-        {
-          id: '2',
-          description: 'Mercado',
-          amount: -250,
-          transaction_type: 'despesa',
-          transaction_date: new Date(Date.now() - 86400000).toISOString(),
-          category_name: 'Alimentação'
-        }
-      ]);
+      setRecentTransactions([]);
       return;
     }
 

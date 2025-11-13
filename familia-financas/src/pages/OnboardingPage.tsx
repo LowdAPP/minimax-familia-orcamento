@@ -1,6 +1,6 @@
 // Página de Onboarding - Wizard de 5 Etapas
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useI18n } from '../hooks/useI18n';
 import { supabase } from '../lib/supabase';
@@ -47,10 +47,18 @@ export default function OnboardingPage() {
   const { user, updateProfile, profile } = useAuth();
   const { t, formatCurrency, language } = useI18n();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const refazer = searchParams.get('refazer') === 'true';
   
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  // Estado para gerenciar as idades como array (mais fácil de trabalhar com dropdowns)
+  const [familyAges, setFamilyAges] = useState<(number | null)[]>([null]);
+  
+  // Estado local para o campo de quantidade de pessoas (permite ficar vazio)
+  const [familyMembersCountInput, setFamilyMembersCountInput] = useState<string>('1');
   
   const [formData, setFormData] = useState<OnboardingData>({
     familyMembersCount: 1,
@@ -70,13 +78,42 @@ export default function OnboardingPage() {
     personaType: 'iniciante_perdido'
   });
 
-  // Redirecionar se já completou onboarding
+  // Redirecionar se já completou onboarding (exceto se estiver refazendo)
   useEffect(() => {
-    if (profile?.onboarding_completed) {
+    if (profile?.onboarding_completed && !refazer) {
       console.log('Onboarding já completado, redirecionando para dashboard');
       navigate('/dashboard', { replace: true });
     }
-  }, [profile, navigate]);
+  }, [profile, navigate, refazer]);
+
+  // Sincronizar o input com o formData quando mudar externamente
+  useEffect(() => {
+    setFamilyMembersCountInput(formData.familyMembersCount.toString());
+  }, [formData.familyMembersCount]);
+
+  // Ajustar array de idades quando a quantidade de membros mudar
+  useEffect(() => {
+    setFamilyAges(prevAges => {
+      // Se o array anterior tem o mesmo tamanho, não precisa ajustar
+      if (prevAges.length === formData.familyMembersCount) {
+        return prevAges;
+      }
+      const newAges = Array(formData.familyMembersCount).fill(null).map((_, index) => {
+        // Manter idade existente se já foi definida, senão null
+        return prevAges[index] ?? null;
+      });
+      return newAges;
+    });
+  }, [formData.familyMembersCount]);
+
+  // Sincronizar array de idades com o formData (como string para compatibilidade)
+  useEffect(() => {
+    const agesString = familyAges
+      .filter(age => age !== null && age !== undefined)
+      .map(age => `${age} anos`)
+      .join(', ');
+    setFormData(prev => ({ ...prev, familyMembersAges: agesString }));
+  }, [familyAges]);
 
   // Auto-save ao mudar de etapa
   useEffect(() => {
@@ -134,8 +171,10 @@ export default function OnboardingPage() {
         if (formData.familyMembersCount < 1) {
           newErrors.familyMembersCount = 'Informe pelo menos 1 membro';
         }
-        if (!formData.familyMembersAges.trim()) {
-          newErrors.familyMembersAges = 'Informe as idades dos membros da família';
+        // Validar se todas as idades foram preenchidas
+        if (familyAges.length !== formData.familyMembersCount || 
+            familyAges.some(age => age === null || age === undefined)) {
+          newErrors.familyMembersAges = 'Informe a idade de todos os membros da família';
         }
         break;
         
@@ -318,35 +357,89 @@ export default function OnboardingPage() {
               <Input
                 type="number"
                 label="Quantas pessoas moram com você? (incluindo você)"
-                value={formData.familyMembersCount}
-                onChange={(e) => updateFormData('familyMembersCount', parseInt(e.target.value) || 0)}
+                value={familyMembersCountInput}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFamilyMembersCountInput(value);
+                  
+                  // Limpar erro ao editar
+                  if (errors.familyMembersCount) {
+                    setErrors(prev => {
+                      const newErrors = { ...prev };
+                      delete newErrors.familyMembersCount;
+                      return newErrors;
+                    });
+                  }
+                  
+                  // Só atualizar formData se houver um valor válido
+                  if (value !== '' && value !== '-') {
+                    const numValue = parseInt(value);
+                    if (!isNaN(numValue) && numValue > 0) {
+                      updateFormData('familyMembersCount', numValue);
+                    }
+                  }
+                }}
+                onBlur={(e) => {
+                  // Quando sair do campo, garantir que há um valor válido
+                  const value = e.target.value;
+                  if (value === '' || value === '0' || parseInt(value) < 1) {
+                    setFamilyMembersCountInput('1');
+                    updateFormData('familyMembersCount', 1);
+                  }
+                }}
                 error={errors.familyMembersCount}
                 min="1"
                 required
               />
 
-              <div>
-                <label className="block text-small font-medium text-neutral-700 mb-xs">
-                  Quais são as idades? <span className="text-error-500">*</span>
-                </label>
-                <textarea
-                  className={`
-                    w-full px-sm py-sm rounded-base border text-body text-neutral-900 
-                    placeholder:text-neutral-500 bg-white transition-all duration-base resize-none
-                    ${errors.familyMembersAges 
-                      ? 'border-error-500 focus:ring-2 focus:ring-error-500' 
-                      : 'border-neutral-200 hover:border-neutral-300 focus:outline-none focus:ring-2 focus:ring-primary-500'
-                    }
-                  `}
-                  rows={3}
-                  value={formData.familyMembersAges}
-                  onChange={(e) => updateFormData('familyMembersAges', e.target.value)}
-                  placeholder="Ex: 35 anos, 32 anos, 8 anos, 5 anos"
-                />
-                {errors.familyMembersAges && (
-                  <p className="text-small text-error-600 mt-xs">{errors.familyMembersAges}</p>
-                )}
-              </div>
+              {formData.familyMembersCount > 0 && (
+                <div>
+                  <label className="block text-small font-medium text-neutral-700 mb-xs">
+                    Quais são as idades? <span className="text-error-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-sm">
+                    {Array.from({ length: formData.familyMembersCount }, (_, index) => (
+                      <div key={index}>
+                        <label className="block text-small text-neutral-600 mb-xs">
+                          Pessoa {index + 1}
+                        </label>
+                        <input
+                          type="number"
+                          value={familyAges[index] ?? ''}
+                          onChange={(e) => {
+                            const newAges = [...familyAges];
+                            const ageValue = e.target.value === '' ? null : parseInt(e.target.value);
+                            newAges[index] = ageValue;
+                            setFamilyAges(newAges);
+                            // Limpar erro ao editar
+                            if (errors.familyMembersAges) {
+                              setErrors(prev => {
+                                const newErrors = { ...prev };
+                                delete newErrors.familyMembersAges;
+                                return newErrors;
+                              });
+                            }
+                          }}
+                          placeholder="Idade"
+                          min="0"
+                          max="120"
+                          className={`
+                            w-full h-12 px-sm rounded-base border text-body text-neutral-900 
+                            bg-white transition-all duration-base
+                            ${errors.familyMembersAges 
+                              ? 'border-error-500 focus:ring-2 focus:ring-error-500' 
+                              : 'border-neutral-200 hover:border-neutral-300 focus:outline-none focus:ring-2 focus:ring-primary-500'
+                            }
+                          `}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {errors.familyMembersAges && (
+                    <p className="text-small text-error-600 mt-xs">{errors.familyMembersAges}</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
