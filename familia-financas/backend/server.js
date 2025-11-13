@@ -221,6 +221,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`[${timestamp}] 🏥 Health check: GET /health`);
   console.log(`[${timestamp}] 📄 API: POST /api/process-pdf`);
   console.log(`[${timestamp}] 🚀 Ready to accept requests!`);
+  console.log(`[${timestamp}] 📍 Environment PORT: ${process.env.PORT || 'not set'}`);
 });
 
 // Prevent premature exits
