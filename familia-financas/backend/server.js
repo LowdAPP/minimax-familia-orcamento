@@ -20,16 +20,49 @@ if (supabaseUrl && supabaseKey) {
 // Função para parsear multipart/form-data
 function parseMultipartFormData(buffer, boundary) {
   const parts = {};
-  const boundaryBuffer = Buffer.from('--' + boundary);
-  const partsArray = buffer.split(boundaryBuffer);
+  const boundaryStr = '--' + boundary;
+  const boundaryBuffer = Buffer.from(boundaryStr);
+  const boundaryLen = boundaryBuffer.length;
   
-  for (let i = 1; i < partsArray.length - 1; i++) {
-    const part = partsArray[i];
-    const headerEnd = part.indexOf('\r\n\r\n');
+  // Encontra todas as ocorrências do boundary
+  const boundaries = [];
+  let searchIndex = 0;
+  
+  while (true) {
+    const index = buffer.indexOf(boundaryBuffer, searchIndex);
+    if (index === -1) break;
+    boundaries.push(index);
+    searchIndex = index + boundaryLen;
+  }
+  
+  // Processa cada parte entre os boundaries
+  for (let i = 0; i < boundaries.length - 1; i++) {
+    const start = boundaries[i] + boundaryLen;
+    const end = boundaries[i + 1];
+    const part = buffer.slice(start, end);
+    
+    // Procura pelo fim do header (CRLFCRLF ou LFLF)
+    const crlfcrlf = Buffer.from('\r\n\r\n');
+    const lflf = Buffer.from('\n\n');
+    
+    let headerEnd = -1;
+    let headerEndLen = 0;
+    
+    const crlfIndex = part.indexOf(crlfcrlf);
+    const lfIndex = part.indexOf(lflf);
+    
+    if (crlfIndex !== -1 && (lfIndex === -1 || crlfIndex < lfIndex)) {
+      headerEnd = crlfIndex;
+      headerEndLen = 4;
+    } else if (lfIndex !== -1) {
+      headerEnd = lfIndex;
+      headerEndLen = 2;
+    }
+    
     if (headerEnd === -1) continue;
     
-    const headers = part.slice(0, headerEnd).toString();
-    const body = part.slice(headerEnd + 4);
+    const headers = part.slice(0, headerEnd).toString('utf-8');
+    const body = part.slice(headerEnd + headerEndLen);
     
     // Extrai o nome do campo do header
     const nameMatch = headers.match(/name="([^"]+)"/);
@@ -40,14 +73,28 @@ function parseMultipartFormData(buffer, boundary) {
     // Verifica se é um arquivo
     const filenameMatch = headers.match(/filename="([^"]+)"/);
     if (filenameMatch) {
-      // É um arquivo
+      // É um arquivo - remove CRLF/LF do final se existir
+      let fileData = body;
+      if (fileData.length >= 2 && fileData[fileData.length - 2] === 0x0D && fileData[fileData.length - 1] === 0x0A) {
+        fileData = fileData.slice(0, -2);
+      } else if (fileData.length >= 1 && fileData[fileData.length - 1] === 0x0A) {
+        fileData = fileData.slice(0, -1);
+      }
+      
       parts[fieldName] = {
         filename: filenameMatch[1],
-        data: body.slice(0, body.length - 2) // Remove \r\n final
+        data: fileData
       };
     } else {
-      // É um campo de texto
-      parts[fieldName] = body.slice(0, body.length - 2).toString().trim(); // Remove \r\n final
+      // É um campo de texto - remove CRLF/LF do final se existir
+      let textData = body;
+      if (textData.length >= 2 && textData[textData.length - 2] === 0x0D && textData[textData.length - 1] === 0x0A) {
+        textData = textData.slice(0, -2);
+      } else if (textData.length >= 1 && textData[textData.length - 1] === 0x0A) {
+        textData = textData.slice(0, -1);
+      }
+      
+      parts[fieldName] = textData.toString('utf-8').trim();
     }
   }
   
