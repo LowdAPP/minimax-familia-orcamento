@@ -473,6 +473,11 @@ async function saveTransactionsToSupabase(transactions) {
       return { success: false, reason: `${invalidTransactions.length} transações com campos obrigatórios faltando`, inserted: 0 };
     }
     
+    // Usar RPC ou inserção direta com service role
+    // Service role key deve bypassar RLS automaticamente
+    console.log('[DB] 🔑 Verificando se está usando service role...');
+    console.log('[DB] 📊 Tentando inserir', transactions.length, 'transações');
+    
     const { data, error } = await supabase
       .from('transactions')
       .insert(transactions)
@@ -484,6 +489,15 @@ async function saveTransactionsToSupabase(transactions) {
       console.error('[DB] ❌ Mensagem:', error.message);
       console.error('[DB] ❌ Detalhes:', error.details);
       console.error('[DB] ❌ Hint:', error.hint);
+      
+      // Se der erro de RLS, verificar qual role está sendo usada
+      if (error.code === '42501' || error.message?.includes('policy') || error.message?.includes('RLS')) {
+        console.error('[DB] ❌ ERRO DE RLS DETECTADO!');
+        console.error('[DB] ❌ Isso indica que não está usando SERVICE_ROLE_KEY corretamente');
+        console.error('[DB] ❌ Verifique se SUPABASE_SERVICE_ROLE_KEY está configurada no Railway');
+        console.error('[DB] ❌ Service Role Key deve começar com "eyJ" e ter mais de 100 caracteres');
+      }
+      
       return { success: false, reason: error.message || 'Erro desconhecido', errorCode: error.code, inserted: 0 };
     }
 
