@@ -13,14 +13,34 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.
 let supabase = null;
 
 if (supabaseUrl && supabaseServiceKey) {
+  // Verificar se é Service Role Key (começa com 'eyJ' e é mais longa)
+  const isServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY && 
+                        process.env.SUPABASE_SERVICE_ROLE_KEY.length > 100;
+  
   supabase = createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,
-      persistSession: false
+      persistSession: false,
+      detectSessionInUrl: false
+    },
+    db: {
+      schema: 'public'
+    },
+    global: {
+      headers: {
+        'apikey': supabaseServiceKey
+      }
     }
   });
+  
   console.log('[INIT] ✅ Supabase client initialized');
-  console.log('[INIT] 🔑 Using:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SERVICE_ROLE_KEY' : 'ANON_KEY (fallback)');
+  console.log('[INIT] 🔑 Using:', isServiceRole ? 'SERVICE_ROLE_KEY ✅' : 'ANON_KEY ⚠️ (fallback - pode não funcionar)');
+  console.log('[INIT] 📍 URL:', supabaseUrl);
+  console.log('[INIT] 🔑 Key length:', supabaseServiceKey ? supabaseServiceKey.length : 0);
+  
+  if (!isServiceRole) {
+    console.log('[INIT] ⚠️ AVISO: Usando ANON_KEY como fallback. Configure SUPABASE_SERVICE_ROLE_KEY!');
+  }
 } else {
   console.log('[INIT] ⚠️ Supabase credentials not configured - database saving disabled');
   console.log('[INIT] ⚠️ Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
