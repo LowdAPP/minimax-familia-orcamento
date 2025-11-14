@@ -174,19 +174,41 @@ export default function DashboardPage() {
       return;
     }
 
+    // Buscar categorias se houver category_id
+    const categoryIds = [...new Set(data.map((t: any) => t.category_id).filter(Boolean))];
+    let categoriesMap = new Map<string, { name: string; color: string }>();
+    
+    if (categoryIds.length > 0) {
+      const { data: categories } = await supabase
+        .from('categories')
+        .select('id, name, color')
+        .in('id', categoryIds);
+      
+      if (categories) {
+        categories.forEach((cat: any) => {
+          categoriesMap.set(cat.id, { name: cat.name, color: cat.color || COLORS[0] });
+        });
+      }
+    }
+
     // Agrupar por categoria
     const categoryMap = new Map<string, number>();
     data.forEach((transaction: any) => {
-      const categoryName = transaction.categories?.name || 'Outros';
+      const category = transaction.category_id ? categoriesMap.get(transaction.category_id) : null;
+      const categoryName = category?.name || 'Outros';
       const currentValue = categoryMap.get(categoryName) || 0;
       categoryMap.set(categoryName, currentValue + Math.abs(transaction.amount));
     });
 
-    const expenses: CategoryExpense[] = Array.from(categoryMap.entries()).map(([name, value], index) => ({
-      name,
-      value,
-      color: COLORS[index % COLORS.length]
-    }));
+    const expenses: CategoryExpense[] = Array.from(categoryMap.entries()).map(([name, value], index) => {
+      // Encontrar cor da categoria se existir
+      const category = Array.from(categoriesMap.values()).find(c => c.name === name);
+      return {
+        name,
+        value,
+        color: category?.color || COLORS[index % COLORS.length]
+      };
+    });
 
     setCategoryExpenses(expenses);
   };
@@ -202,7 +224,7 @@ export default function DashboardPage() {
         amount,
         transaction_type,
         transaction_date,
-        categories (name)
+        category_id
       `)
       .eq('user_id', user.id)
       .order('transaction_date', { ascending: false })
@@ -219,6 +241,23 @@ export default function DashboardPage() {
       return;
     }
 
+    // Buscar categorias se houver category_id
+    const categoryIds = [...new Set(data.map((t: any) => t.category_id).filter(Boolean))];
+    let categoriesMap = new Map<string, string>();
+    
+    if (categoryIds.length > 0) {
+      const { data: categories } = await supabase
+        .from('categories')
+        .select('id, name')
+        .in('id', categoryIds);
+      
+      if (categories) {
+        categories.forEach((cat: any) => {
+          categoriesMap.set(cat.id, cat.name);
+        });
+      }
+    }
+
     setRecentTransactions(
       data.map((t: any) => ({
         id: t.id,
@@ -226,7 +265,7 @@ export default function DashboardPage() {
         amount: t.amount,
         transaction_type: t.transaction_type,
         transaction_date: t.transaction_date,
-        category_name: t.categories?.name
+        category_name: t.category_id ? categoriesMap.get(t.category_id) : undefined
       }))
     );
   };
