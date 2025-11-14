@@ -135,11 +135,25 @@ export default function TransactionsPage() {
       query = query.eq('transaction_type', filterType);
     }
 
+    console.log(`📅 Carregando transações de ${firstDay} até ${endDate} (mês: ${filterMonth})`);
+
     const { data, error } = await query;
 
     if (error) {
-      console.error('Erro ao carregar transações:', error);
+      console.error('❌ Erro ao carregar transações:', error);
       return;
+    }
+
+    console.log(`✅ ${data?.length || 0} transações carregadas para o mês ${filterMonth}`);
+    if (data && data.length > 0) {
+      console.log('📋 Primeiras 3 transações:', data.slice(0, 3).map((t: any) => ({
+        date: t.transaction_date,
+        description: t.description?.substring(0, 30),
+        amount: t.amount,
+        source: t.source
+      })));
+    } else {
+      console.log('⚠️ Nenhuma transação encontrada para este mês');
     }
 
     setTransactions(

@@ -817,6 +817,7 @@ const server = http.createServer(async (req, res) => {
         message: 'PDF processado com sucesso',
         transactionsFound: transactions.length,
         transactionsInserted: dbResult.inserted || 0,
+        transactions: transactions.slice(0, 10), // Primeiras 10 para o frontend detectar o mês
         pdfPages: pdfData.numpages,
         databaseSave: dbResult,
         timestamp: timestamp
