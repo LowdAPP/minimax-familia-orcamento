@@ -156,7 +156,7 @@ export default function DashboardPage() {
       .from('transactions')
       .select(`
         amount,
-        categories (name, color)
+        category_id
       `)
       .eq('user_id', user.id)
       .eq('transaction_type', 'despesa')
