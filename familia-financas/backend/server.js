@@ -6,15 +6,24 @@ const { createClient } = require('@supabase/supabase-js');
 const PORT = process.env.PORT || 3000;
 
 // Inicializar cliente Supabase
+// IMPORTANTE: Usar SERVICE_ROLE_KEY para bypassar RLS policies
+// O backend precisa inserir transações em nome dos usuários
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 let supabase = null;
 
-if (supabaseUrl && supabaseKey) {
-  supabase = createClient(supabaseUrl, supabaseKey);
+if (supabaseUrl && supabaseServiceKey) {
+  supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
   console.log('[INIT] ✅ Supabase client initialized');
+  console.log('[INIT] 🔑 Using:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SERVICE_ROLE_KEY' : 'ANON_KEY (fallback)');
 } else {
   console.log('[INIT] ⚠️ Supabase credentials not configured - database saving disabled');
+  console.log('[INIT] ⚠️ Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
 }
 
 // Função para parsear multipart/form-data

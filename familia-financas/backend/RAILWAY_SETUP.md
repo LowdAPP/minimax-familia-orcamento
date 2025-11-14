@@ -32,8 +32,15 @@ Como fazer:
 ### 3. Variáveis de Ambiente
 Configurar no Railway:
 - `SUPABASE_URL` = URL do seu projeto Supabase
-- `SUPABASE_ANON_KEY` = Chave anônima do Supabase
+- `SUPABASE_SERVICE_ROLE_KEY` = **Service Role Key** do Supabase (NÃO use ANON_KEY)
+  - ⚠️ **IMPORTANTE:** Use a Service Role Key para bypassar RLS policies
+  - Encontre em: Supabase Dashboard → Settings → API → service_role key
 - `PORT` = Deixar Railway definir automaticamente (ou `3000`)
+
+**Por que Service Role Key?**
+- O backend precisa inserir transações em nome dos usuários
+- A Service Role Key bypassa RLS policies
+- A ANON_KEY não funciona porque não há usuário autenticado no backend
 
 ### 4. Port
 **Target Port:** `3000`
