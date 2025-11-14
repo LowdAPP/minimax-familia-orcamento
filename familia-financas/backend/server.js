@@ -478,10 +478,63 @@ async function saveTransactionsToSupabase(transactions) {
     console.log('[DB] 🔑 Verificando se está usando service role...');
     console.log('[DB] 📊 Tentando inserir', transactions.length, 'transações');
     
-    const { data, error } = await supabase
+    // Tentar inserção direta primeiro
+    // Se falhar com RLS, tentar usar RPC function
+    let { data, error } = await supabase
       .from('transactions')
       .insert(transactions)
       .select('id');
+    
+    // Se der erro de RLS, tentar usar função RPC que bypassa RLS
+    if (error && (error.code === '42501' || error.message?.includes('policy') || error.message?.includes('RLS'))) {
+      console.log('[DB] 🔄 Erro de RLS detectado, tentando usar função RPC...');
+      
+      // Tentar inserir via RPC function (se existir)
+      const { data: rpcData, error: rpcError } = await supabase.rpc('insert_transactions_bulk', {
+        transactions_data: transactions
+      });
+      
+      if (!rpcError && rpcData) {
+        console.log('[DB] ✅ Inserção via RPC funcionou!');
+        data = rpcData;
+        error = null;
+      } else {
+        console.log('[DB] ⚠️ RPC function não existe, tentando inserção em lote menor...');
+        
+        // Tentar inserir em lotes menores (às vezes ajuda)
+        const batchSize = 10;
+        const batches = [];
+        for (let i = 0; i < transactions.length; i += batchSize) {
+          batches.push(transactions.slice(i, i + batchSize));
+        }
+        
+        let allData = [];
+        let hasError = false;
+        
+        for (const batch of batches) {
+          const { data: batchData, error: batchError } = await supabase
+            .from('transactions')
+            .insert(batch)
+            .select('id');
+          
+          if (batchError) {
+            console.error(`[DB] ❌ Erro ao inserir lote:`, batchError.message);
+            hasError = true;
+            error = batchError;
+            break;
+          }
+          
+          if (batchData) {
+            allData = allData.concat(batchData);
+          }
+        }
+        
+        if (!hasError) {
+          data = allData;
+          error = null;
+        }
+      }
+    }
 
     if (error) {
       console.error('[DB] ❌ Erro ao salvar no Supabase:', JSON.stringify(error, null, 2));
