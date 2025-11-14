@@ -305,8 +305,12 @@ export default function TransactionsPage() {
       // Se houver transações no resultado, ajustar filtro para o mês das transações
       if (result.transactions && result.transactions.length > 0) {
         const firstTransaction = result.transactions[0];
+        console.log('📋 Primeira transação do resultado:', firstTransaction);
+        
         if (firstTransaction.transaction_date) {
           const transactionMonth = firstTransaction.transaction_date.substring(0, 7); // YYYY-MM
+          console.log(`📅 Mês da transação: ${transactionMonth}, Filtro atual: ${filterMonth}`);
+          
           if (transactionMonth !== filterMonth) {
             console.log(`📅 Ajustando filtro de ${filterMonth} para ${transactionMonth} (mês das transações importadas)`);
             setFilterMonth(transactionMonth);
@@ -314,10 +318,14 @@ export default function TransactionsPage() {
             return;
           }
         }
+      } else {
+        // Se não tiver transações no resultado, tentar buscar todas as transações recentes
+        console.log('⚠️ Nenhuma transação no resultado, recarregando do banco...');
       }
 
       // Recarregar transações
-      loadTransactions();
+      console.log('🔄 Recarregando transações...');
+      await loadTransactions();
 
     } catch (error: any) {
       console.error('❌ Erro completo ao processar PDF:', error);
