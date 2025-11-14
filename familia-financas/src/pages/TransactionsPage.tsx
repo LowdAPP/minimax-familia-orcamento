@@ -486,6 +486,84 @@ export default function TransactionsPage() {
     setTransactionToDelete(null);
   };
 
+  const handleEditClick = async (transaction: Transaction) => {
+    // Buscar account_id da transação se não estiver disponível
+    let accountId = '';
+    if (transaction.id) {
+      const { data } = await supabase
+        .from('transactions')
+        .select('account_id')
+        .eq('id', transaction.id)
+        .single();
+      
+      if (data) {
+        accountId = data.account_id || '';
+      }
+    }
+
+    setTransactionToEdit(transaction);
+    setEditTransaction({
+      description: transaction.description,
+      amount: Math.abs(transaction.amount),
+      transaction_type: transaction.transaction_type,
+      transaction_date: transaction.transaction_date,
+      account_id: accountId
+    });
+  };
+
+  const handleEditConfirm = async () => {
+    if (!transactionToEdit || !user || !editTransaction.description || editTransaction.amount === 0) {
+      alert('Preencha todos os campos obrigatórios');
+      return;
+    }
+
+    setEditing(true);
+    try {
+      // Garantir que existe account_id válido
+      let accountId = editTransaction.account_id || accounts[0]?.id;
+      
+      if (!accountId) {
+        accountId = accounts[0]?.id;
+      }
+
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+          description: editTransaction.description,
+          amount: editTransaction.transaction_type === 'despesa' 
+            ? -Math.abs(editTransaction.amount) 
+            : Math.abs(editTransaction.amount),
+          transaction_type: editTransaction.transaction_type,
+          transaction_date: editTransaction.transaction_date,
+          account_id: accountId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', transactionToEdit.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setTransactionToEdit(null);
+      loadTransactions();
+    } catch (error) {
+      console.error('Erro ao editar transação:', error);
+      alert('Erro ao editar transação. Tente novamente.');
+    } finally {
+      setEditing(false);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setTransactionToEdit(null);
+    setEditTransaction({
+      description: '',
+      amount: 0,
+      transaction_type: 'despesa',
+      transaction_date: '',
+      account_id: ''
+    });
+  };
+
   const exportToCSV = () => {
     const headers = ['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor'];
     const rows = filteredTransactions.map(t => [
@@ -840,6 +918,99 @@ export default function TransactionsPage() {
                 fullWidth
               >
                 Adicionar
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal: Editar Transação */}
+      {transactionToEdit && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-sm z-50">
+          <Card className="max-w-lg w-full">
+            <h3 className="text-h4 font-bold text-neutral-900 mb-lg">Editar Transação</h3>
+            
+            <div className="space-y-md">
+              <Input
+                label="Descrição"
+                value={editTransaction.description}
+                onChange={(e) => setEditTransaction({ ...editTransaction, description: e.target.value })}
+                placeholder="Ex: Compra no mercado"
+                required
+              />
+
+              <div className="grid grid-cols-2 gap-md">
+                <div>
+                  <label className="block text-small font-medium text-neutral-700 mb-xs">
+                    Tipo <span className="text-error-500">*</span>
+                  </label>
+                  <select
+                    value={editTransaction.transaction_type}
+                    onChange={(e) => setEditTransaction({ ...editTransaction, transaction_type: e.target.value as any })}
+                    className="w-full h-12 px-sm rounded-base border border-neutral-200 focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="despesa">Despesa</option>
+                    <option value="receita">Receita</option>
+                  </select>
+                </div>
+
+                <Input
+                  type="number"
+                  label={language === 'pt-PT' ? 'Valor (€)' : 'Valor (R$)'}
+                  value={editTransaction.amount || ''}
+                  onChange={(e) => setEditTransaction({ ...editTransaction, amount: parseFloat(e.target.value) || 0 })}
+                  placeholder="0,00"
+                  step="0.01"
+                  required
+                />
+              </div>
+
+              <Input
+                type="date"
+                label="Data"
+                value={editTransaction.transaction_date}
+                onChange={(e) => setEditTransaction({ ...editTransaction, transaction_date: e.target.value })}
+                required
+              />
+
+              {accounts.length > 0 && (
+                <div>
+                  <label className="block text-small font-medium text-neutral-700 mb-xs">
+                    Conta
+                  </label>
+                  <select
+                    value={editTransaction.account_id}
+                    onChange={(e) => setEditTransaction({ ...editTransaction, account_id: e.target.value })}
+                    className="w-full h-12 px-sm rounded-base border border-neutral-200 focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Selecione uma conta</option>
+                    {accounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.nickname} - {account.institution}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-sm mt-lg pt-lg border-t border-neutral-200">
+              <Button
+                variant="ghost"
+                onClick={handleEditCancel}
+                fullWidth
+                disabled={editing}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleEditConfirm}
+                fullWidth
+                loading={editing}
+                disabled={editing}
+              >
+                Salvar Alterações
               </Button>
             </div>
           </Card>
