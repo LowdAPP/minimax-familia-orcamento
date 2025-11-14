@@ -563,9 +563,46 @@ async function saveTransactionsToSupabase(transactions) {
         console.error('[DB] ❌ Isso indica que não está usando SERVICE_ROLE_KEY corretamente');
         console.error('[DB] ❌ Verifique se SUPABASE_SERVICE_ROLE_KEY está configurada no Railway');
         console.error('[DB] ❌ Service Role Key deve começar com "eyJ" e ter mais de 100 caracteres');
+        console.error('[DB] 🔄 Tentando usar função RPC como fallback...');
+        
+        // Tentar RPC novamente aqui também (caso o código acima não tenha executado)
+        try {
+          const transactionsJsonb = transactions.map(t => ({
+            user_id: t.user_id,
+            account_id: t.account_id,
+            category_id: t.category_id || null,
+            transaction_date: t.transaction_date,
+            amount: t.amount.toString(),
+            description: t.description,
+            merchant: t.merchant || null,
+            transaction_type: t.transaction_type,
+            status: t.status || 'confirmed',
+            source: t.source || 'pdf_import'
+          }));
+          
+          console.log('[DB] 🔄 Chamando função RPC insert_transactions_bulk...');
+          const { data: rpcData, error: rpcError } = await supabase.rpc('insert_transactions_bulk', {
+            transactions_data: transactionsJsonb
+          });
+          
+          if (rpcError) {
+            console.error('[DB] ❌ Erro na função RPC:', rpcError);
+            console.error('[DB] ❌ A função insert_transactions_bulk pode não existir no banco');
+            console.error('[DB] ❌ Execute a migration: 1763000001_create_insert_transactions_bulk_function.sql');
+          } else if (rpcData) {
+            console.log('[DB] ✅ Inserção via RPC funcionou!', rpcData.length, 'transações inseridas');
+            data = rpcData;
+            error = null;
+          }
+        } catch (rpcErr) {
+          console.error('[DB] ❌ Exceção ao chamar RPC:', rpcErr.message);
+        }
       }
       
-      return { success: false, reason: error.message || 'Erro desconhecido', errorCode: error.code, inserted: 0 };
+      // Se ainda tiver erro após tentar RPC, retornar
+      if (error) {
+        return { success: false, reason: error.message || 'Erro desconhecido', errorCode: error.code, inserted: 0 };
+      }
     }
 
     const insertedCount = data ? data.length : 0;
