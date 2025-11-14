@@ -302,6 +302,20 @@ export default function TransactionsPage() {
       setUploadProgress('');
       setUploading(false);
 
+      // Se houver transações no resultado, ajustar filtro para o mês das transações
+      if (result.transactions && result.transactions.length > 0) {
+        const firstTransaction = result.transactions[0];
+        if (firstTransaction.transaction_date) {
+          const transactionMonth = firstTransaction.transaction_date.substring(0, 7); // YYYY-MM
+          if (transactionMonth !== filterMonth) {
+            console.log(`📅 Ajustando filtro de ${filterMonth} para ${transactionMonth} (mês das transações importadas)`);
+            setFilterMonth(transactionMonth);
+            // loadTransactions será chamado automaticamente pelo useEffect quando filterMonth mudar
+            return;
+          }
+        }
+      }
+
       // Recarregar transações
       loadTransactions();
 
