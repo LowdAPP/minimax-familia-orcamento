@@ -226,8 +226,18 @@ export default function TransactionsPage() {
       }
 
       const transactionCount = result.transactionsInserted || 0;
+      const transactionsFound = result.transactionsFound || 0;
 
-      if (transactionCount === 0) {
+      // Se encontrou transações mas não salvou, mostra aviso
+      if (transactionsFound > 0 && transactionCount === 0) {
+        const errorMsg = result.error || result.databaseSave?.reason || 'Erro desconhecido ao salvar no banco de dados';
+        alert(`⚠️ ${transactionsFound} transações encontradas, mas nenhuma foi salva.\n\nErro: ${errorMsg}\n\n💡 Verifique os logs do backend ou as configurações do Supabase.`);
+        setUploadProgress('');
+        setUploading(false);
+        return;
+      }
+
+      if (transactionCount === 0 && transactionsFound === 0) {
         alert('Nenhuma transação foi encontrada no PDF.\n\n💡 Verifique se o arquivo contém transações visíveis (não imagens escaneadas).');
         setUploadProgress('');
         setUploading(false);

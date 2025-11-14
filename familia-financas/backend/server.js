@@ -432,6 +432,17 @@ async function saveTransactionsToSupabase(transactions) {
 
   try {
     console.log(`[DB] 💾 Tentando salvar ${transactions.length} transações...`);
+    console.log(`[DB] 📋 Primeira transação (exemplo):`, JSON.stringify(transactions[0], null, 2));
+    
+    // Valida formato das transações antes de inserir
+    const invalidTransactions = transactions.filter(t => {
+      return !t.user_id || !t.account_id || !t.transaction_date || !t.amount;
+    });
+    
+    if (invalidTransactions.length > 0) {
+      console.error(`[DB] ❌ ${invalidTransactions.length} transações com campos inválidos:`, invalidTransactions[0]);
+      return { success: false, reason: `${invalidTransactions.length} transações com campos obrigatórios faltando`, inserted: 0 };
+    }
     
     const { data, error } = await supabase
       .from('transactions')
@@ -439,8 +450,12 @@ async function saveTransactionsToSupabase(transactions) {
       .select('id');
 
     if (error) {
-      console.error('[DB] ❌ Erro ao salvar no Supabase:', error);
-      return { success: false, reason: error.message, inserted: 0 };
+      console.error('[DB] ❌ Erro ao salvar no Supabase:', JSON.stringify(error, null, 2));
+      console.error('[DB] ❌ Código do erro:', error.code);
+      console.error('[DB] ❌ Mensagem:', error.message);
+      console.error('[DB] ❌ Detalhes:', error.details);
+      console.error('[DB] ❌ Hint:', error.hint);
+      return { success: false, reason: error.message || 'Erro desconhecido', errorCode: error.code, inserted: 0 };
     }
 
     const insertedCount = data ? data.length : 0;
@@ -448,6 +463,7 @@ async function saveTransactionsToSupabase(transactions) {
     return { success: true, inserted: insertedCount };
   } catch (err) {
     console.error('[DB] ❌ Exceção ao salvar no Supabase:', err.message);
+    console.error('[DB] ❌ Stack:', err.stack);
     return { success: false, reason: err.message, inserted: 0 };
   }
 }
@@ -646,18 +662,30 @@ const server = http.createServer(async (req, res) => {
       // Salva no banco de dados
       const dbResult = await saveTransactionsToSupabase(transactions);
 
-      // Retorna resultado (formato compatível com frontend)
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
+      console.log(`[${timestamp}] 💾 Resultado do salvamento:`, JSON.stringify(dbResult, null, 2));
+      
+      // Se houve erro ao salvar, ainda retorna sucesso mas com informação do erro
+      const response = {
         success: true,
         message: 'PDF processado com sucesso',
         transactionsFound: transactions.length,
         transactionsInserted: dbResult.inserted || 0,
-        transactions: transactions.slice(0, 50), // Primeiras 50 para debug
         pdfPages: pdfData.numpages,
         databaseSave: dbResult,
         timestamp: timestamp
-      }));
+      };
+
+      // Adiciona aviso se não salvou
+      if (dbResult.inserted === 0 && transactions.length > 0) {
+        response.warning = 'Transações encontradas mas não foram salvas no banco de dados';
+        response.error = dbResult.reason || 'Erro desconhecido ao salvar';
+        console.log(`[${timestamp}] ⚠️ AVISO: ${transactions.length} transações encontradas mas 0 salvas!`);
+        console.log(`[${timestamp}] ⚠️ Motivo: ${dbResult.reason || 'Desconhecido'}`);
+      }
+
+      // Retorna resultado (formato compatível com frontend)
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(response));
       return;
 
     } catch (error) {
