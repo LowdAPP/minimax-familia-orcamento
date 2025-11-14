@@ -20,7 +20,8 @@ import {
   CheckCircle,
   XCircle,
   Calendar,
-  DollarSign
+  DollarSign,
+  Pencil
 } from 'lucide-react';
 
 interface Transaction {
@@ -70,6 +71,17 @@ export default function TransactionsPage() {
   // Modal de confirmação de exclusão
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Modal de edição
+  const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editTransaction, setEditTransaction] = useState({
+    description: '',
+    amount: 0,
+    transaction_type: 'despesa' as 'receita' | 'despesa',
+    transaction_date: '',
+    account_id: ''
+  });
 
   // Modal de resultado do upload
   const [resultModal, setResultModal] = useState<{
@@ -124,7 +136,8 @@ export default function TransactionsPage() {
         transaction_date,
         status,
         source,
-        category_id
+        category_id,
+        account_id
       `)
       .eq('user_id', user.id)
       .gte('transaction_date', firstDay)
@@ -712,13 +725,22 @@ export default function TransactionsPage() {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleDeleteClick(transaction)}
-                    className="p-2 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-base transition-colors"
-                    title="Excluir transação"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-xs">
+                    <button
+                      onClick={() => handleEditClick(transaction)}
+                      className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-base transition-colors"
+                      title="Editar transação"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClick(transaction)}
+                      className="p-2 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-base transition-colors"
+                      title="Excluir transação"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
