@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { ResultModal } from '../components/ui/Modal';
 import {
   Upload,
   Download,
@@ -69,6 +70,22 @@ export default function TransactionsPage() {
   // Modal de confirmação de exclusão
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Modal de resultado do upload
+  const [resultModal, setResultModal] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+    details?: string;
+    transactionCount?: number;
+    transactionsFound?: number;
+  }>({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
 
   useEffect(() => {
     if (user) {
@@ -158,7 +175,12 @@ export default function TransactionsPage() {
     if (!file || !user) return;
 
     if (file.type !== 'application/pdf') {
-      alert('Por favor, selecione um arquivo PDF válido');
+      setResultModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Arquivo Inválido',
+        message: 'Por favor, selecione um arquivo PDF válido'
+      });
       return;
     }
 
@@ -219,7 +241,13 @@ export default function TransactionsPage() {
       console.log('✅ Resultado:', result);
 
       if (!result.success) {
-        alert(result.error || 'Erro ao processar PDF');
+        setResultModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Erro ao Processar PDF',
+          message: result.error || 'Erro ao processar PDF',
+          details: 'Tente novamente ou verifique se o arquivo está correto.'
+        });
         setUploadProgress('');
         setUploading(false);
         return;
@@ -231,27 +259,51 @@ export default function TransactionsPage() {
       // Se encontrou transações mas não salvou, mostra aviso
       if (transactionsFound > 0 && transactionCount === 0) {
         const errorMsg = result.error || result.databaseSave?.reason || 'Erro desconhecido ao salvar no banco de dados';
-        alert(`⚠️ ${transactionsFound} transações encontradas, mas nenhuma foi salva.\n\nErro: ${errorMsg}\n\n💡 Verifique os logs do backend ou as configurações do Supabase.`);
+        setResultModal({
+          isOpen: true,
+          type: 'warning',
+          title: 'Transações Não Salvas',
+          message: `${transactionsFound} transações encontradas, mas nenhuma foi salva.`,
+          details: `Erro: ${errorMsg}\n\n💡 Verifique os logs do backend ou as configurações do Supabase.`,
+          transactionsFound,
+          transactionCount: 0
+        });
         setUploadProgress('');
         setUploading(false);
         return;
       }
 
       if (transactionCount === 0 && transactionsFound === 0) {
-        alert('Nenhuma transação foi encontrada no PDF.\n\n💡 Verifique se o arquivo contém transações visíveis (não imagens escaneadas).');
+        setResultModal({
+          isOpen: true,
+          type: 'warning',
+          title: 'Nenhuma Transação Encontrada',
+          message: 'Nenhuma transação foi encontrada no PDF.',
+          details: '💡 Verifique se o arquivo contém transações visíveis (não imagens escaneadas).',
+          transactionsFound: 0,
+          transactionCount: 0
+        });
         setUploadProgress('');
         setUploading(false);
         return;
       }
 
-      setUploadProgress(`✅ ${transactionCount} transações importadas com sucesso!`);
+      // Sucesso!
+      setResultModal({
+        isOpen: true,
+        type: 'success',
+        title: 'PDF Processado com Sucesso!',
+        message: `${transactionCount} transação${transactionCount !== 1 ? 'ões' : ''} importada${transactionCount !== 1 ? 's' : ''} com sucesso!`,
+        details: 'As transações foram adicionadas à sua conta.',
+        transactionCount,
+        transactionsFound
+      });
 
-      // 2. Recarregar transações
-      setTimeout(() => {
-        loadTransactions();
-        setUploadProgress('');
-        setUploading(false);
-      }, 2000);
+      setUploadProgress('');
+      setUploading(false);
+
+      // Recarregar transações
+      loadTransactions();
 
     } catch (error: any) {
       console.error('❌ Erro completo ao processar PDF:', error);
@@ -264,17 +316,30 @@ export default function TransactionsPage() {
       }
       
       // Mensagens mais amigáveis para erros comuns
+      let friendlyMessage = errorMessage;
+      let details = '';
+      
       if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
-        errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente.';
+        friendlyMessage = 'Erro de conexão';
+        details = 'Verifique sua internet e tente novamente.';
       } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
-        errorMessage = 'Sessão expirada. Por favor, faça login novamente.';
+        friendlyMessage = 'Sessão expirada';
+        details = 'Por favor, faça login novamente.';
       } else if (errorMessage.includes('404')) {
-        errorMessage = 'Serviço não encontrado. Verifique se a edge function está deployada.';
+        friendlyMessage = 'Serviço não encontrado';
+        details = 'Verifique se o backend está deployado e funcionando.';
       } else if (errorMessage.includes('500')) {
-        errorMessage = 'Erro no servidor. Por favor, tente novamente mais tarde.';
+        friendlyMessage = 'Erro no servidor';
+        details = 'Por favor, tente novamente mais tarde.';
       }
       
-      alert(`❌ ${errorMessage}`);
+      setResultModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Erro ao Processar PDF',
+        message: friendlyMessage,
+        details: details || 'Tente novamente ou entre em contato com o suporte.'
+      });
       setUploadProgress('');
       setUploading(false);
     }
@@ -788,6 +853,18 @@ export default function TransactionsPage() {
           </Card>
         </div>
       )}
+
+      {/* Modal: Resultado do Upload */}
+      <ResultModal
+        isOpen={resultModal.isOpen}
+        onClose={() => setResultModal({ ...resultModal, isOpen: false })}
+        type={resultModal.type}
+        title={resultModal.title}
+        message={resultModal.message}
+        details={resultModal.details}
+        transactionCount={resultModal.transactionCount}
+        transactionsFound={resultModal.transactionsFound}
+      />
     </div>
   );
 }
