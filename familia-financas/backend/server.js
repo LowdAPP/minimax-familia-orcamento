@@ -490,8 +490,22 @@ async function saveTransactionsToSupabase(transactions) {
       console.log('[DB] 🔄 Erro de RLS detectado, tentando usar função RPC...');
       
       // Tentar inserir via RPC function (se existir)
+      // Converter transações para formato JSONB array
+      const transactionsJsonb = transactions.map(t => ({
+        user_id: t.user_id,
+        account_id: t.account_id,
+        category_id: t.category_id || null,
+        transaction_date: t.transaction_date,
+        amount: t.amount.toString(),
+        description: t.description,
+        merchant: t.merchant || null,
+        transaction_type: t.transaction_type,
+        status: t.status || 'confirmed',
+        source: t.source || 'pdf_import'
+      }));
+      
       const { data: rpcData, error: rpcError } = await supabase.rpc('insert_transactions_bulk', {
-        transactions_data: transactions
+        transactions_data: transactionsJsonb
       });
       
       if (!rpcError && rpcData) {
