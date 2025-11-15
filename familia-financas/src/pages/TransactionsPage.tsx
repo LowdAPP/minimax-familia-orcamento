@@ -1582,7 +1582,7 @@ export default function TransactionsPage() {
                     </div>
                   </div>
                 );
-              })}
+              }))}
             </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-sm mt-lg pt-lg border-t border-neutral-200">
