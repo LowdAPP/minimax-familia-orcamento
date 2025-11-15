@@ -829,18 +829,18 @@ export default function TransactionsPage() {
         </div>
 
         {/* Resumo */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-md">
-          <div className="p-md bg-neutral-50 rounded-base">
-            <p className="text-small text-neutral-600 mb-xs">Total de Transações</p>
-            <p className="text-h4 font-bold text-neutral-900">{filteredTransactions.length}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-sm sm:gap-md">
+          <div className="p-sm sm:p-md bg-neutral-50 rounded-base">
+            <p className="text-xs sm:text-small text-neutral-600 mb-xs">Total de Transações</p>
+            <p className="text-body md:text-h4 font-bold text-neutral-900">{filteredTransactions.length}</p>
           </div>
-          <div className="p-md bg-success-50 rounded-base">
-            <p className="text-small text-success-700 mb-xs">Receitas</p>
-            <p className="text-h4 font-bold text-success-700">{formatCurrency(totalIncome)}</p>
+          <div className="p-sm sm:p-md bg-success-50 rounded-base">
+            <p className="text-xs sm:text-small text-success-700 mb-xs">Receitas</p>
+            <p className="text-body md:text-h4 font-bold text-success-700">{formatCurrency(totalIncome)}</p>
           </div>
-          <div className="p-md bg-error-50 rounded-base">
-            <p className="text-small text-error-700 mb-xs">Despesas</p>
-            <p className="text-h4 font-bold text-error-700">{formatCurrency(totalExpenses)}</p>
+          <div className="p-sm sm:p-md bg-error-50 rounded-base">
+            <p className="text-xs sm:text-small text-error-700 mb-xs">Despesas</p>
+            <p className="text-body md:text-h4 font-bold text-error-700">{formatCurrency(totalExpenses)}</p>
           </div>
         </div>
 
