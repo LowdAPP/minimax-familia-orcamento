@@ -704,14 +704,14 @@ export default function TransactionsPage() {
   const detectDuplicates = (transactionsList: Transaction[]) => {
     const duplicatesMap = new Map<string, Transaction[]>();
     
-    // Agrupar por descrição normalizada e valor
+    // Agrupar por data, descrição normalizada e valor
     const grouped = new Map<string, Transaction[]>();
     
     transactionsList.forEach(transaction => {
       // Normalizar descrição (lowercase, trim)
       const normalizedDesc = transaction.description.toLowerCase().trim();
-      // Criar chave única: descrição + valor absoluto
-      const key = `${normalizedDesc}|${Math.abs(transaction.amount).toFixed(2)}`;
+      // Criar chave única: data + descrição + valor absoluto
+      const key = `${transaction.transaction_date}|${normalizedDesc}|${Math.abs(transaction.amount).toFixed(2)}`;
       
       if (!grouped.has(key)) {
         grouped.set(key, []);
@@ -831,23 +831,6 @@ export default function TransactionsPage() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-sm">
-          <Button 
-            variant={duplicates.size > 0 ? "primary" : "secondary"} 
-            onClick={() => {
-              setSelectedDuplicates(new Set());
-              setShowDuplicatesModal(true);
-            }}
-            fullWidth 
-            className="sm:w-auto"
-          >
-            <AlertTriangle className="w-4 h-4" />
-            <span className="hidden sm:inline">
-              {duplicates.size > 0 ? `Duplicatas (${duplicates.size})` : 'Verificar Duplicatas'}
-            </span>
-            <span className="sm:hidden">
-              {duplicates.size > 0 ? `Duplicatas` : 'Duplicatas'}
-            </span>
-          </Button>
           <Button variant="secondary" onClick={exportToCSV} fullWidth className="sm:w-auto">
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Exportar CSV</span>
@@ -1584,7 +1567,7 @@ export default function TransactionsPage() {
                     </div>
                   </div>
                 );
-              }))}
+              })}
             </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-sm mt-lg pt-lg border-t border-neutral-200">
