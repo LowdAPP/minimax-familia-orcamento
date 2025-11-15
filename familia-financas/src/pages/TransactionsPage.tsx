@@ -1075,7 +1075,7 @@ export default function TransactionsPage() {
                 required
               />
 
-              <div className="grid grid-cols-2 gap-md">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-md">
                 <div>
                   <label className="block text-small font-medium text-neutral-700 mb-xs">
                     Tipo <span className="text-error-500">*</span>
