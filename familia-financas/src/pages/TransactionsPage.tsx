@@ -1333,12 +1333,26 @@ export default function TransactionsPage() {
                   )}
                   <div
                     className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      transaction.transaction_type === 'receita'
+                      transaction.category_color
+                        ? ''
+                        : transaction.transaction_type === 'receita'
                         ? 'bg-success-100 text-success-600'
                         : 'bg-error-100 text-error-600'
                     }`}
+                    style={
+                      transaction.category_color
+                        ? {
+                            backgroundColor: transaction.category_color + '20',
+                            color: transaction.category_color
+                          }
+                        : undefined
+                    }
                   >
-                    <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
+                    {transaction.category_icon ? (
+                      renderCategoryIcon(transaction.category_icon, 'w-4 h-4 sm:w-5 sm:h-5')
+                    ) : (
+                      <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
+                    )}
                   </div>
 
                   <div className="flex-1 min-w-0">
