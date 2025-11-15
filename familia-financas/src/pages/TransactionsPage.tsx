@@ -58,6 +58,7 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
+  const [selectedAccountForUpload, setSelectedAccountForUpload] = useState<string>('');
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
@@ -237,12 +238,23 @@ export default function TransactionsPage() {
       return;
     }
 
+    // Validar se uma conta foi selecionada
+    if (!selectedAccountForUpload && accounts.length > 0) {
+      setResultModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Conta Não Selecionada',
+        message: 'Por favor, selecione uma conta para associar as transações do PDF.'
+      });
+      return;
+    }
+
     setUploading(true);
     setUploadProgress('Fazendo upload do arquivo...');
 
     try {
-      // 0. Garantir que existe pelo menos uma conta ativa
-      let accountId = accounts[0]?.id;
+      // Usar conta selecionada ou criar uma padrão se não houver contas
+      let accountId = selectedAccountForUpload || accounts[0]?.id;
       
       if (!accountId) {
         setUploadProgress('Criando conta padrão...');
@@ -265,6 +277,7 @@ export default function TransactionsPage() {
         
         accountId = newAccount.id;
         setAccounts([newAccount]);
+        setSelectedAccountForUpload(newAccount.id);
       }
 
       setUploadProgress('Enviando PDF para processamento...');
@@ -749,6 +762,38 @@ export default function TransactionsPage() {
               Faça upload do PDF do seu banco para importação automática de transações
             </p>
           </div>
+          
+          {/* Seleção de conta */}
+          {accounts.length > 0 ? (
+            <div>
+              <label className="block text-small font-medium text-neutral-700 mb-xs">
+                Conta <span className="text-error-500">*</span>
+              </label>
+              <select
+                value={selectedAccountForUpload}
+                onChange={(e) => setSelectedAccountForUpload(e.target.value)}
+                disabled={uploading}
+                className="w-full h-12 px-sm rounded-base border border-neutral-200 focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">Selecione uma conta</option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.nickname}{account.institution ? ` - ${account.institution}` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-neutral-500 mt-xs">
+                As transações do PDF serão associadas a esta conta
+              </p>
+            </div>
+          ) : (
+            <div className="p-sm bg-warning-50 border border-warning-200 rounded-base">
+              <p className="text-small text-warning-700">
+                ⚠️ Nenhuma conta disponível. Uma conta padrão será criada automaticamente.
+              </p>
+            </div>
+          )}
+
           <div className="w-full sm:w-auto">
             <label htmlFor="pdf-upload" className="block w-full sm:w-auto">
               <input
@@ -756,14 +801,14 @@ export default function TransactionsPage() {
                 type="file"
                 accept="application/pdf"
                 onChange={handleFileUpload}
-                disabled={uploading}
+                disabled={uploading || (accounts.length > 0 && !selectedAccountForUpload)}
                 className="hidden"
               />
               <Button
                 variant="primary"
                 as="span"
                 loading={uploading}
-                disabled={uploading}
+                disabled={uploading || (accounts.length > 0 && !selectedAccountForUpload)}
                 fullWidth
                 className="sm:w-auto"
               >
