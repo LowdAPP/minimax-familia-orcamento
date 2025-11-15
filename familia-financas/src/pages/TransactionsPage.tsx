@@ -930,6 +930,14 @@ export default function TransactionsPage() {
                     <span className="text-small text-neutral-500">
                       {formatDate(transaction.transaction_date)}
                     </span>
+                    {transaction.account_name && (
+                      <>
+                        <span className="text-neutral-300">•</span>
+                        <span className="text-small text-neutral-600 font-medium">
+                          {transaction.account_name}
+                        </span>
+                      </>
+                    )}
                     {transaction.category_name && (
                       <>
                         <span className="text-neutral-300">•</span>
