@@ -26,7 +26,61 @@ import {
   CheckSquare,
   Square,
   X,
-  AlertTriangle
+  AlertTriangle,
+  Tag,
+  Home,
+  Utensils,
+  Car,
+  Heart,
+  Book,
+  Smile,
+  ShoppingBag,
+  Coffee,
+  Plane,
+  PiggyBank,
+  TrendingUp,
+  CreditCard,
+  Wallet,
+  Receipt,
+  ShoppingCart,
+  Gift,
+  Music,
+  Film,
+  Gamepad2,
+  Dumbbell,
+  Briefcase,
+  GraduationCap,
+  Building,
+  Zap,
+  Star,
+  Bell,
+  Camera,
+  Phone,
+  Wifi,
+  Droplet,
+  Flame,
+  Bike,
+  Bus,
+  Train,
+  MapPin,
+  Mail,
+  Users,
+  Stethoscope,
+  Pill,
+  Apple,
+  Pizza,
+  Shirt,
+  Headphones,
+  Tv,
+  Laptop,
+  Smartphone,
+  BookOpen,
+  School,
+  Calculator,
+  Scissors,
+  Wrench,
+  Paintbrush,
+  Sparkles
 } from 'lucide-react';
 
 interface Transaction {
@@ -38,6 +92,7 @@ interface Transaction {
   transaction_date: string;
   category_name?: string;
   category_color?: string;
+  category_icon?: string;
   status: 'pending' | 'confirmed' | 'cancelled';
   source: 'manual' | 'pdf_import' | 'api';
   account_id?: string;
@@ -259,7 +314,7 @@ export default function TransactionsPage() {
 
     const { data } = await supabase
       .from('categories')
-      .select('id, name, color, category_type')
+      .select('id, name, color, category_type, icon')
       .or(`user_id.eq.${user.id},is_system_category.eq.true`)
       .order('name');
 
@@ -886,6 +941,73 @@ export default function TransactionsPage() {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR');
+  };
+
+  // Helper para renderizar ícone dinamicamente
+  const renderCategoryIcon = (iconName: string | undefined, className: string = 'w-5 h-5', style?: React.CSSProperties) => {
+    const ICONS: Record<string, any> = {
+      'home': Home,
+      'utensils': Utensils,
+      'car': Car,
+      'heart': Heart,
+      'book': Book,
+      'smile': Smile,
+      'shopping-bag': ShoppingBag,
+      'coffee': Coffee,
+      'plane': Plane,
+      'piggy-bank': PiggyBank,
+      'trending-up': TrendingUp,
+      'credit-card': CreditCard,
+      'tag': Tag,
+      'dollar-sign': DollarSign,
+      'wallet': Wallet,
+      'receipt': Receipt,
+      'shopping-cart': ShoppingCart,
+      'gift': Gift,
+      'music': Music,
+      'film': Film,
+      'gamepad-2': Gamepad2,
+      'dumbbell': Dumbbell,
+      'briefcase': Briefcase,
+      'graduation-cap': GraduationCap,
+      'building': Building,
+      'zap': Zap,
+      'star': Star,
+      'bell': Bell,
+      'camera': Camera,
+      'phone': Phone,
+      'wifi': Wifi,
+      'droplet': Droplet,
+      'flame': Flame,
+      'bike': Bike,
+      'bus': Bus,
+      'train': Train,
+      'map-pin': MapPin,
+      'mail': Mail,
+      'users': Users,
+      'stethoscope': Stethoscope,
+      'pill': Pill,
+      'apple': Apple,
+      'pizza': Pizza,
+      'shirt': Shirt,
+      'laptop': Laptop,
+      'smartphone': Smartphone,
+      'tv': Tv,
+      'headphones': Headphones,
+      'book-open': BookOpen,
+      'school': School,
+      'calculator': Calculator,
+      'scissors': Scissors,
+      'wrench': Wrench,
+      'paintbrush': Paintbrush,
+      'sparkles': Sparkles
+    };
+
+    const IconComponent = iconName ? ICONS[iconName] : null;
+    if (IconComponent) {
+      return <IconComponent className={className} style={style} />;
+    }
+    return <Tag className={className} style={style} />;
   };
 
   const filteredTransactions = transactions.filter(t =>
@@ -1926,6 +2048,73 @@ export default function TransactionsPage() {
               ) : (
                 <p className="text-small text-neutral-600">
                   Nenhuma categoria disponível
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-sm mt-lg pt-lg border-t border-neutral-200">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowBulkCategoryModal(false);
+                  setBulkCategoryId('');
+                }}
+                fullWidth
+                disabled={bulkUpdating}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleBulkCategoryUpdate}
+                fullWidth
+                loading={bulkUpdating}
+                disabled={bulkUpdating}
+              >
+                Atualizar {selectedTransactions.size} Transação{selectedTransactions.size !== 1 ? 'ões' : ''}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal: Alterar Categoria em Massa */}
+      {showBulkCategoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-sm z-50 overflow-y-auto">
+          <Card className="max-w-md w-full m-sm max-h-[90vh] overflow-y-auto">
+            <h3 className="text-body md:text-h4 font-bold text-neutral-900 mb-lg">
+              Alterar Categoria de {selectedTransactions.size} Transação{selectedTransactions.size !== 1 ? 'ões' : ''}
+            </h3>
+            
+            <div className="space-y-md">
+              <p className="text-body text-neutral-700">
+                Selecione a categoria para aplicar às transações selecionadas (ou deixe vazio para remover):
+              </p>
+              
+              {categories.length > 0 ? (
+                <div>
+                  <label className="block text-small font-medium text-neutral-700 mb-xs">
+                    Categoria
+                  </label>
+                  <select
+                    value={bulkCategoryId}
+                    onChange={(e) => setBulkCategoryId(e.target.value)}
+                    className="w-full h-12 px-sm rounded-base border border-neutral-200 focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Remover categoria</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-neutral-500 mt-xs">
+                    Selecione uma categoria ou deixe vazio para remover a categoria das transações
+                  </p>
+                </div>
+              ) : (
+                <p className="text-small text-neutral-600">
+                  Nenhuma categoria disponível. Crie uma categoria primeiro.
                 </p>
               )}
             </div>
