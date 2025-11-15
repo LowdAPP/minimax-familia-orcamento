@@ -39,6 +39,8 @@ interface Transaction {
   category_color?: string;
   status: 'pending' | 'confirmed' | 'cancelled';
   source: 'manual' | 'pdf_import' | 'api';
+  account_id?: string;
+  account_name?: string;
 }
 
 interface Account {
@@ -180,19 +182,27 @@ export default function TransactionsPage() {
       console.log('⚠️ Nenhuma transação encontrada para este mês');
     }
 
+    // Criar mapa de contas para busca rápida
+    const accountsMap = new Map(accounts.map(acc => [acc.id, acc]));
+
     setTransactions(
-      data?.map((t: any) => ({
-        id: t.id,
-        description: t.description,
-        merchant: t.merchant,
-        amount: t.amount,
-        transaction_type: t.transaction_type,
-        transaction_date: t.transaction_date,
-        category_name: undefined,
-        category_color: undefined,
-        status: t.status,
-        source: t.source
-      })) || []
+      data?.map((t: any) => {
+        const account = t.account_id ? accountsMap.get(t.account_id) : null;
+        return {
+          id: t.id,
+          description: t.description,
+          merchant: t.merchant,
+          amount: t.amount,
+          transaction_type: t.transaction_type,
+          transaction_date: t.transaction_date,
+          category_name: undefined,
+          category_color: undefined,
+          status: t.status,
+          source: t.source,
+          account_id: t.account_id,
+          account_name: account ? `${account.nickname}${account.institution ? ` - ${account.institution}` : ''}` : undefined
+        };
+      }) || []
     );
   };
 
