@@ -125,6 +125,7 @@ export default function TransactionsPage() {
     if (user) {
       loadData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, filterMonth, filterType, filterAccount]);
 
   const loadData = async () => {
@@ -198,25 +199,32 @@ export default function TransactionsPage() {
     // Criar mapa de contas para busca rápida
     const accountsMap = new Map(accounts.map(acc => [acc.id, acc]));
 
-    setTransactions(
-      data?.map((t: any) => {
-        const account = t.account_id ? accountsMap.get(t.account_id) : null;
-        return {
-          id: t.id,
-          description: t.description,
-          merchant: t.merchant,
-          amount: t.amount,
-          transaction_type: t.transaction_type,
-          transaction_date: t.transaction_date,
-          category_name: undefined,
-          category_color: undefined,
-          status: t.status,
-          source: t.source,
-          account_id: t.account_id,
-          account_name: account ? `${account.nickname}${account.institution ? ` - ${account.institution}` : ''}` : undefined
-        };
-      }) || []
-    );
+    const transactionsData = data?.map((t: any) => {
+      const account = t.account_id ? accountsMap.get(t.account_id) : null;
+      return {
+        id: t.id,
+        description: t.description,
+        merchant: t.merchant,
+        amount: t.amount,
+        transaction_type: t.transaction_type,
+        transaction_date: t.transaction_date,
+        category_name: undefined,
+        category_color: undefined,
+        status: t.status,
+        source: t.source,
+        account_id: t.account_id,
+        account_name: account ? `${account.nickname}${account.institution ? ` - ${account.institution}` : ''}` : undefined
+      };
+    }) || [];
+
+    setTransactions(transactionsData);
+    
+    // Detectar duplicatas após carregar transações
+    if (transactionsData.length > 0) {
+      detectDuplicates(transactionsData);
+    } else {
+      setDuplicates(new Map());
+    }
   };
 
   const loadAccounts = async () => {
