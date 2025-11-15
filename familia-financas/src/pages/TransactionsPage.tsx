@@ -967,22 +967,30 @@ export default function TransactionsPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-xs">
-                    <button
-                      onClick={() => handleEditClick(transaction)}
-                      className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-base transition-colors"
-                      title="Editar transação"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteClick(transaction)}
-                      className="p-2 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-base transition-colors"
-                      title="Excluir transação"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  {!isSelectionMode && (
+                    <div className="flex items-center gap-xs">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditClick(transaction);
+                        }}
+                        className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-base transition-colors"
+                        title="Editar transação"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteClick(transaction);
+                        }}
+                        className="p-2 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-base transition-colors"
+                        title="Excluir transação"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
