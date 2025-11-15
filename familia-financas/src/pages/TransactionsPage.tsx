@@ -87,7 +87,7 @@ export default function TransactionsPage() {
   const [editTransaction, setEditTransaction] = useState({
     description: '',
     amount: 0,
-    transaction_type: 'despesa' as 'receita' | 'despesa',
+    transaction_type: 'despesa' as 'receita' | 'despesa' | 'transferencia',
     transaction_date: '',
     account_id: ''
   });
@@ -916,6 +916,36 @@ export default function TransactionsPage() {
           </div>
         )}
       </Card>
+
+      {/* Alerta de Duplicatas */}
+      {duplicates.size > 0 && (
+        <Card className="bg-warning-50 border-warning-200">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-sm">
+            <div className="flex items-center gap-sm">
+              <AlertTriangle className="w-5 h-5 text-warning-600 flex-shrink-0" />
+              <div>
+                <p className="text-body font-semibold text-warning-900">
+                  {duplicates.size} grupo{duplicates.size !== 1 ? 's' : ''} de transações duplicadas encontrado{duplicates.size !== 1 ? 's' : ''}
+                </p>
+                <p className="text-small text-warning-700">
+                  {Array.from(duplicates.values()).reduce((sum, group) => sum + group.length, 0)} transações duplicadas no total
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                setSelectedDuplicates(new Set());
+                setShowDuplicatesModal(true);
+              }}
+            >
+              <AlertTriangle className="w-4 h-4" />
+              Ver Duplicatas
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Filtros e Resumo */}
       <Card>
