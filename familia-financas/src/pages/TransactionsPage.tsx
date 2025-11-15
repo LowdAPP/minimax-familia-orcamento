@@ -34,7 +34,6 @@ import {
   Heart,
   Book,
   Smile,
-  ShoppingBag,
   Coffee,
   Plane,
   PiggyBank,
