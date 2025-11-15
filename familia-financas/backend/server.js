@@ -162,7 +162,8 @@ function parseAmount(amountStr) {
   if (!amountStr) return null;
   
   // Remove espaços e caracteres especiais, exceto números, vírgula e ponto
-  let cleaned = amountStr.toString().trim().replace(/[^\d,.-]/g, '');
+  // Primeiro remove espaços (usados como separador de milhares em formato PT)
+  let cleaned = amountStr.toString().trim().replace(/\s/g, '').replace(/[^\d,.-]/g, '');
   
   // Se tem vírgula e ponto, assume formato brasileiro: 1.234,56
   if (cleaned.includes(',') && cleaned.includes('.')) {
@@ -208,6 +209,12 @@ function parseTransactionsFromText(text, userId, accountId) {
   // Múltiplos padrões para diferentes formatos de extrato
   const patterns = [
     {
+      name: 'Santander PT - Data Duplicada Sem Espaço',
+      // DD-MM-YYYYDD-MM-YYYY (sem espaço entre datas) seguido de descrição e valor em linhas separadas
+      // Este padrão precisa ser processado linha por linha, não via regex simples
+      isLineByLine: true
+    },
+    {
       name: 'Santander PT - Data Duplicada',
       // DD-MM-YYYY DD-MM-YYYY Descrição Valor EUR Saldo EUR
       regex: /(\d{2}-\d{2}-\d{4})\s+(\d{2}-\d{2}-\d{4})\s+(.+?)\s+([\+\-]?\s*\d{1,3}(?:\.\d{3})*,\d{2})\s*EUR/gi
@@ -232,6 +239,95 @@ function parseTransactionsFromText(text, userId, accountId) {
   // Tenta cada padrão
   for (const pattern of patterns) {
     console.log(`[PARSE] 🔍 Tentando padrão: ${pattern.name}`);
+    
+    // Padrão especial: Data duplicada sem espaço (formato linha por linha)
+    if (pattern.isLineByLine && pattern.name === 'Santander PT - Data Duplicada Sem Espaço') {
+      const dateDuplicatedPattern = /^(\d{2}-\d{2}-\d{4})(\d{2}-\d{2}-\d{4})$/;
+      // Padrão para valor: pode ter espaços entre milhares (ex: "5 935,98 EUR" ou "+ 180,00 EUR")
+      const amountPattern = /([\+\-]?)\s*(\d{1,3}(?:\s*\d{3})*,\d{2})\s*EUR/;
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const dateMatch = line.match(dateDuplicatedPattern);
+        
+        if (dateMatch) {
+          // Encontrou linha com data duplicada sem espaço
+          const dateStr = dateMatch[1]; // Usa primeira data
+          const transactionDate = parseDate(dateStr);
+          
+          if (!transactionDate) continue;
+          
+          // Próxima linha deve ser a descrição
+          if (i + 1 >= lines.length) continue;
+          let description = lines[i + 1].trim();
+          
+          // Linha seguinte deve ter o valor (e saldo)
+          if (i + 2 >= lines.length) continue;
+          const amountLine = lines[i + 2].trim();
+          const amountMatch = amountLine.match(amountPattern);
+          
+          if (!amountMatch) continue;
+          
+          const sign = amountMatch[1] === '+' ? 1 : -1;
+          const amountValue = parseAmount(amountMatch[2]);
+          
+          if (!amountValue || amountValue < 0.01) continue;
+          
+          const amount = sign * amountValue;
+          
+          // Limpa descrição
+          description = description
+            .trim()
+            .replace(/\s+/g, ' ')
+            .replace(/[|\t]/g, ' ')
+            .trim();
+          
+          // Validações
+          if (description.length < 3 || description.length > 500) continue;
+          if (/^[\d\s\.\,\-\/\+€\$£EURR\$USD]+$/.test(description)) continue;
+          
+          const lowerDesc = description.toLowerCase();
+          if (lowerDesc.includes('disponível') || 
+              lowerDesc.includes('autorizado') ||
+              lowerDesc.includes('saldo contabilístico') ||
+              (lowerDesc.includes('data') && lowerDesc.includes('tipo'))) {
+            continue;
+          }
+          
+          // Verifica duplicatas
+          const isDuplicate = transactions.some(t =>
+            t.transaction_date === transactionDate &&
+            Math.abs(t.amount - amount) < 0.01 &&
+            t.description === description
+          );
+          
+          if (!isDuplicate) {
+            console.log(`[PARSE] ✅ Transação encontrada: ${transactionDate} | ${description.substring(0, 40)} | ${amount}`);
+            transactions.push({
+              user_id: userId,
+              account_id: accountId,
+              transaction_date: transactionDate,
+              amount: amount,
+              description: description,
+              merchant: extractMerchant(description),
+              transaction_type: amount > 0 ? 'receita' : 'despesa',
+              status: 'confirmed',
+              source: 'pdf_import'
+            });
+          }
+          
+          // Pula as linhas já processadas
+          i += 2;
+        }
+      }
+      
+      if (transactions.length > 0) {
+        console.log(`[PARSE] ✅ Usando padrão ${pattern.name} - ${transactions.length} transações encontradas`);
+        break;
+      }
+      continue;
+    }
+    
     const textToSearch = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     let matchCount = 0;
 

@@ -338,7 +338,84 @@ function parseTransactionsFromText(text: string): { transactions: any[], bankFor
   
   console.log('🔍 Iniciando parse multi-banco...');
   
-  // Normalizar texto
+  // PRIMEIRO: Tentar padrão especial de data duplicada sem espaço (linha por linha)
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const dateDuplicatedPattern = /^(\d{2}-\d{2}-\d{4})(\d{2}-\d{2}-\d{4})$/;
+  const amountPattern = /([\+\-]?)\s*(\d{1,3}(?:\s*\d{3})*,\d{2})\s*EUR/;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const dateMatch = line.match(dateDuplicatedPattern);
+    
+    if (dateMatch) {
+      const dateStr = dateMatch[1];
+      const transactionDate = parseDate(dateStr);
+      
+      if (!transactionDate) continue;
+      
+      if (i + 1 >= lines.length) continue;
+      let description = lines[i + 1].trim();
+      
+      if (i + 2 >= lines.length) continue;
+      const amountLine = lines[i + 2].trim();
+      const amountMatch = amountLine.match(amountPattern);
+      
+      if (!amountMatch) continue;
+      
+      const sign = amountMatch[1] === '+' ? 1 : -1;
+      const amountValue = parseAmount(amountMatch[2]);
+      
+      if (isNaN(amountValue) || Math.abs(amountValue) < 0.01 || Math.abs(amountValue) > 999999) continue;
+      
+      const amount = sign * amountValue;
+      
+      description = description
+        .replace(/\s+/g, ' ')
+        .replace(/[\x00-\x1F]/g, '')
+        .trim();
+      
+      if (description.length < 3 || description.length > 150) continue;
+      if (/^[\d\s\.\,\-\/\+€\$£]+$/.test(description)) continue;
+      
+      const lowerDesc = description.toLowerCase();
+      if (lowerDesc.includes('disponível') || 
+          lowerDesc.includes('autorizado') ||
+          lowerDesc.includes('saldo contabilístico') ||
+          (lowerDesc.includes('data') && lowerDesc.includes('tipo'))) {
+        continue;
+      }
+      
+      if (description.length > 100) {
+        description = description.substring(0, 97) + '...';
+      }
+      
+      const isDuplicate = transactions.some(t => 
+        t.date === transactionDate && 
+        Math.abs(t.amount - amount) < 0.01 && 
+        t.description === description
+      );
+      
+      if (!isDuplicate) {
+        transactions.push({
+          date: transactionDate,
+          description: description,
+          merchant: extractMerchant(description),
+          amount: amount
+        });
+      }
+      
+      i += 2;
+    }
+  }
+  
+  if (transactions.length > 0) {
+    bankFormat = 'Santander PT - Data Duplicada Sem Espaço';
+    console.log(`✅ Sucesso com "${bankFormat}": ${transactions.length} transações`);
+    transactions.sort((a, b) => b.date.localeCompare(a.date));
+    return { transactions, bankFormat };
+  }
+  
+  // Normalizar texto para padrões regex
   const normalized = text.replace(/\s+/g, ' ').trim();
   
   // PATTERNS para diferentes bancos (ordem: mais específico → mais genérico)
