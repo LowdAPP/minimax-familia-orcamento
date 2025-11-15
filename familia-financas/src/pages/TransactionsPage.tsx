@@ -162,6 +162,10 @@ export default function TransactionsPage() {
       query = query.eq('transaction_type', filterType);
     }
 
+    if (filterAccount !== 'all') {
+      query = query.eq('account_id', filterAccount);
+    }
+
     console.log(`📅 Carregando transações de ${firstDay} até ${endDate} (mês: ${filterMonth})`);
 
     const { data, error } = await query;
