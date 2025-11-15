@@ -831,6 +831,24 @@ export default function TransactionsPage() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-sm">
+          <Button 
+            variant={duplicates.size > 0 ? "primary" : "secondary"} 
+            onClick={() => {
+              setSelectedDuplicates(new Set());
+              setShowDuplicatesModal(true);
+            }}
+            fullWidth 
+            className="sm:w-auto"
+            disabled={duplicates.size === 0}
+          >
+            <AlertTriangle className="w-4 h-4" />
+            <span className="hidden sm:inline">
+              {duplicates.size > 0 ? `Duplicatas (${duplicates.size})` : 'Verificar Duplicatas'}
+            </span>
+            <span className="sm:hidden">
+              {duplicates.size > 0 ? `Duplicatas` : 'Duplicatas'}
+            </span>
+          </Button>
           <Button variant="secondary" onClick={exportToCSV} fullWidth className="sm:w-auto">
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Exportar CSV</span>
