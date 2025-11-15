@@ -56,6 +56,7 @@ export default function TransactionsPage() {
   const { t, formatCurrency, language } = useI18n();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
@@ -74,7 +75,8 @@ export default function TransactionsPage() {
     amount: 0,
     transaction_type: 'despesa' as 'receita' | 'despesa',
     transaction_date: new Date().toISOString().split('T')[0],
-    account_id: ''
+    account_id: '',
+    category_id: ''
   });
 
   // Modal de confirmação de exclusão
@@ -89,7 +91,8 @@ export default function TransactionsPage() {
     amount: 0,
     transaction_type: 'despesa' as 'receita' | 'despesa' | 'transferencia',
     transaction_date: '',
-    account_id: ''
+    account_id: '',
+    category_id: ''
   });
 
   // Seleção múltipla
@@ -98,6 +101,8 @@ export default function TransactionsPage() {
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [showBulkAccountModal, setShowBulkAccountModal] = useState(false);
   const [bulkAccountId, setBulkAccountId] = useState('');
+  const [showBulkCategoryModal, setShowBulkCategoryModal] = useState(false);
+  const [bulkCategoryId, setBulkCategoryId] = useState('');
 
   // Duplicatas
   const [duplicates, setDuplicates] = useState<Map<string, Transaction[]>>(new Map());
@@ -131,7 +136,7 @@ export default function TransactionsPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      await Promise.all([loadTransactions(), loadAccounts()]);
+      await Promise.all([loadTransactions(), loadAccounts(), loadCategories()]);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     } finally {
@@ -198,9 +203,13 @@ export default function TransactionsPage() {
 
     // Criar mapa de contas para busca rápida
     const accountsMap = new Map(accounts.map(acc => [acc.id, acc]));
+    
+    // Criar mapa de categorias para busca rápida (garantir que categorias estejam carregadas)
+    const categoriesMap = new Map((categories || []).map(cat => [cat.id, cat]));
 
     const transactionsData = data?.map((t: any) => {
       const account = t.account_id ? accountsMap.get(t.account_id) : null;
+      const category = t.category_id ? categoriesMap.get(t.category_id) : null;
       return {
         id: t.id,
         description: t.description,
@@ -208,8 +217,8 @@ export default function TransactionsPage() {
         amount: t.amount,
         transaction_type: t.transaction_type,
         transaction_date: t.transaction_date,
-        category_name: undefined,
-        category_color: undefined,
+        category_name: category?.name,
+        category_color: category?.color,
         status: t.status,
         source: t.source,
         account_id: t.account_id,
@@ -243,6 +252,18 @@ export default function TransactionsPage() {
     if (!selectedAccountForUpload && accountsData.length > 0) {
       setSelectedAccountForUpload(accountsData[0].id);
     }
+  };
+
+  const loadCategories = async () => {
+    if (!user) return;
+
+    const { data } = await supabase
+      .from('categories')
+      .select('id, name, color, category_type')
+      .or(`user_id.eq.${user.id},is_system_category.eq.true`)
+      .order('name');
+
+    setCategories(data || []);
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -494,6 +515,7 @@ export default function TransactionsPage() {
           : Math.abs(newTransaction.amount),
         transaction_type: newTransaction.transaction_type,
         transaction_date: newTransaction.transaction_date,
+        category_id: newTransaction.category_id || null,
         status: 'confirmed',
         source: 'manual'
       });
@@ -506,7 +528,8 @@ export default function TransactionsPage() {
         amount: 0,
         transaction_type: 'despesa',
         transaction_date: new Date().toISOString().split('T')[0],
-        account_id: ''
+        account_id: '',
+        category_id: ''
       });
       loadTransactions();
     } catch (error) {
@@ -547,17 +570,19 @@ export default function TransactionsPage() {
   };
 
   const handleEditClick = async (transaction: Transaction) => {
-    // Buscar account_id da transação se não estiver disponível
+    // Buscar account_id e category_id da transação
     let accountId = '';
+    let categoryId = '';
     if (transaction.id) {
       const { data } = await supabase
         .from('transactions')
-        .select('account_id')
+        .select('account_id, category_id')
         .eq('id', transaction.id)
         .single();
       
       if (data) {
         accountId = data.account_id || '';
+        categoryId = data.category_id || '';
       }
     }
 
@@ -567,7 +592,8 @@ export default function TransactionsPage() {
       amount: Math.abs(transaction.amount),
       transaction_type: transaction.transaction_type,
       transaction_date: transaction.transaction_date,
-      account_id: accountId
+      account_id: accountId,
+      category_id: categoryId
     });
   };
 
@@ -596,6 +622,7 @@ export default function TransactionsPage() {
           transaction_type: editTransaction.transaction_type,
           transaction_date: editTransaction.transaction_date,
           account_id: accountId,
+          category_id: editTransaction.category_id || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', transactionToEdit.id)
@@ -620,7 +647,8 @@ export default function TransactionsPage() {
       amount: 0,
       transaction_type: 'despesa',
       transaction_date: '',
-      account_id: ''
+      account_id: '',
+      category_id: ''
     });
   };
 
@@ -653,7 +681,12 @@ export default function TransactionsPage() {
 
   const handleBulkAccountUpdate = async () => {
     if (!user || selectedTransactions.size === 0 || !bulkAccountId) {
-      alert('Selecione pelo menos uma transação e uma conta');
+      setResultModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Seleção Inválida',
+        message: 'Selecione pelo menos uma transação e uma conta.'
+      });
       return;
     }
 
@@ -693,6 +726,62 @@ export default function TransactionsPage() {
         type: 'error',
         title: 'Erro ao Atualizar',
         message: 'Erro ao atualizar contas das transações.',
+        details: 'Tente novamente ou entre em contato com o suporte.'
+      });
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
+  const handleBulkCategoryUpdate = async () => {
+    if (!user || selectedTransactions.size === 0) {
+      setResultModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Seleção Inválida',
+        message: 'Selecione pelo menos uma transação.'
+      });
+      return;
+    }
+
+    setBulkUpdating(true);
+    try {
+      const transactionIds = Array.from(selectedTransactions);
+      
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+          category_id: bulkCategoryId || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id)
+        .in('id', transactionIds);
+
+      if (error) throw error;
+
+      // Limpar seleção e recarregar
+      setSelectedTransactions(new Set());
+      setIsSelectionMode(false);
+      setShowBulkCategoryModal(false);
+      setBulkCategoryId('');
+      loadTransactions();
+
+      setResultModal({
+        isOpen: true,
+        type: 'success',
+        title: 'Categorias Atualizadas!',
+        message: `${transactionIds.length} transação${transactionIds.length !== 1 ? 'ões' : ''} atualizada${transactionIds.length !== 1 ? 's' : ''} com sucesso!`,
+        details: bulkCategoryId 
+          ? 'As categorias foram alteradas para a categoria selecionada.'
+          : 'As categorias foram removidas das transações selecionadas.'
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar categorias em massa:', error);
+      setResultModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Erro ao Atualizar',
+        message: 'Erro ao atualizar categorias das transações.',
         details: 'Tente novamente ou entre em contato com o suporte.'
       });
     } finally {
@@ -1296,6 +1385,26 @@ export default function TransactionsPage() {
                   </select>
                 </div>
               )}
+
+              {categories.length > 0 && (
+                <div>
+                  <label className="block text-small font-medium text-neutral-700 mb-xs">
+                    Categoria
+                  </label>
+                  <select
+                    value={newTransaction.category_id}
+                    onChange={(e) => setNewTransaction({ ...newTransaction, category_id: e.target.value })}
+                    className="w-full h-12 px-sm rounded-base border border-neutral-200 focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Selecione uma categoria (opcional)</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-sm mt-lg pt-lg border-t border-neutral-200">
@@ -1382,6 +1491,26 @@ export default function TransactionsPage() {
                     {accounts.map((account) => (
                       <option key={account.id} value={account.id}>
                         {account.nickname} - {account.institution}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {categories.length > 0 && (
+                <div>
+                  <label className="block text-small font-medium text-neutral-700 mb-xs">
+                    Categoria
+                  </label>
+                  <select
+                    value={editTransaction.category_id}
+                    onChange={(e) => setEditTransaction({ ...editTransaction, category_id: e.target.value })}
+                    className="w-full h-12 px-sm rounded-base border border-neutral-200 focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Selecione uma categoria (opcional)</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
                       </option>
                     ))}
                   </select>
