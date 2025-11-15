@@ -839,7 +839,6 @@ export default function TransactionsPage() {
             }}
             fullWidth 
             className="sm:w-auto"
-            disabled={duplicates.size === 0}
           >
             <AlertTriangle className="w-4 h-4" />
             <span className="hidden sm:inline">
@@ -1585,7 +1584,7 @@ export default function TransactionsPage() {
                     </div>
                   </div>
                 );
-              })}
+              }))}
             </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-sm mt-lg pt-lg border-t border-neutral-200">
