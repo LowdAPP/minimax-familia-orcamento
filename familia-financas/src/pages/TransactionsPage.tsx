@@ -63,6 +63,7 @@ export default function TransactionsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'receita' | 'despesa'>('all');
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [filterAccount, setFilterAccount] = useState<string>('all');
   
   // Modal de nova transação
   const [showAddModal, setShowAddModal] = useState(false);
@@ -116,7 +117,7 @@ export default function TransactionsPage() {
     if (user) {
       loadData();
     }
-  }, [user, filterMonth, filterType]);
+  }, [user, filterMonth, filterType, filterAccount]);
 
   const loadData = async () => {
     setLoading(true);
