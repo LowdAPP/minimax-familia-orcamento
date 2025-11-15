@@ -952,7 +952,7 @@ export default function TransactionsPage() {
       'heart': Heart,
       'book': Book,
       'smile': Smile,
-      'shopping-bag': ShoppingBag,
+      'shopping-bag': ShoppingCart,
       'coffee': Coffee,
       'plane': Plane,
       'piggy-bank': PiggyBank,
