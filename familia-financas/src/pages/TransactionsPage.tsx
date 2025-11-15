@@ -993,7 +993,8 @@ export default function TransactionsPage() {
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-xl">
