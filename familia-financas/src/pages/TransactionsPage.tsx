@@ -779,7 +779,7 @@ export default function TransactionsPage() {
 
       {/* Filtros e Resumo */}
       <Card>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-md mb-lg">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-md mb-lg">
           <div className="md:col-span-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
@@ -809,6 +809,19 @@ export default function TransactionsPage() {
             <option value="all">Todos os tipos</option>
             <option value="receita">Receitas</option>
             <option value="despesa">Despesas</option>
+          </select>
+
+          <select
+            value={filterAccount}
+            onChange={(e) => setFilterAccount(e.target.value)}
+            className="h-12 px-sm rounded-base border border-neutral-200 focus:ring-2 focus:ring-primary-500"
+          >
+            <option value="all">Todas as contas</option>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.nickname}{account.institution ? ` - ${account.institution}` : ''}
+              </option>
+            ))}
           </select>
         </div>
 
