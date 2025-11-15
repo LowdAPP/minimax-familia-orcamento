@@ -1889,6 +1889,73 @@ export default function TransactionsPage() {
         </div>
       )}
 
+      {/* Modal: Alterar Categoria em Massa */}
+      {showBulkCategoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-sm z-50 overflow-y-auto">
+          <Card className="max-w-md w-full m-sm max-h-[90vh] overflow-y-auto">
+            <h3 className="text-body md:text-h4 font-bold text-neutral-900 mb-lg">
+              Alterar Categoria de {selectedTransactions.size} Transação{selectedTransactions.size !== 1 ? 'ões' : ''}
+            </h3>
+            
+            <div className="space-y-md">
+              <p className="text-body text-neutral-700">
+                Selecione a categoria para aplicar às transações selecionadas (ou deixe vazio para remover):
+              </p>
+              
+              {categories.length > 0 ? (
+                <div>
+                  <label className="block text-small font-medium text-neutral-700 mb-xs">
+                    Categoria
+                  </label>
+                  <select
+                    value={bulkCategoryId}
+                    onChange={(e) => setBulkCategoryId(e.target.value)}
+                    className="w-full h-12 px-sm rounded-base border border-neutral-200 focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Remover categoria</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-neutral-500 mt-xs">
+                    Selecione uma categoria ou deixe vazio para remover a categoria das transações
+                  </p>
+                </div>
+              ) : (
+                <p className="text-small text-neutral-600">
+                  Nenhuma categoria disponível
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-sm mt-lg pt-lg border-t border-neutral-200">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowBulkCategoryModal(false);
+                  setBulkCategoryId('');
+                }}
+                fullWidth
+                disabled={bulkUpdating}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleBulkCategoryUpdate}
+                fullWidth
+                loading={bulkUpdating}
+                disabled={bulkUpdating}
+              >
+                Atualizar {selectedTransactions.size} Transação{selectedTransactions.size !== 1 ? 'ões' : ''}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
       {/* Modal: Resultado do Upload */}
       <ResultModal
         isOpen={resultModal.isOpen}
