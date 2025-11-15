@@ -1062,9 +1062,9 @@ export default function TransactionsPage() {
 
       {/* Modal: Nova Transação */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-sm z-50">
-          <Card className="max-w-lg w-full">
-            <h3 className="text-h4 font-bold text-neutral-900 mb-lg">Nova Transação</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-sm z-50 overflow-y-auto">
+          <Card className="max-w-lg w-full m-sm max-h-[90vh] overflow-y-auto">
+            <h3 className="text-body md:text-h4 font-bold text-neutral-900 mb-lg">Nova Transação</h3>
             
             <div className="space-y-md">
               <Input
@@ -1166,7 +1166,7 @@ export default function TransactionsPage() {
                 required
               />
 
-              <div className="grid grid-cols-2 gap-md">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-md">
                 <div>
                   <label className="block text-small font-medium text-neutral-700 mb-xs">
                     Tipo <span className="text-error-500">*</span>
