@@ -274,6 +274,7 @@ export default function TransactionsPage() {
         transaction_date: t.transaction_date,
         category_name: category?.name,
         category_color: category?.color,
+        category_icon: category?.icon,
         status: t.status,
         source: t.source,
         account_id: t.account_id,
