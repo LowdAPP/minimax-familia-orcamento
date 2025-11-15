@@ -22,7 +22,10 @@ import {
   XCircle,
   Calendar,
   DollarSign,
-  Pencil
+  Pencil,
+  CheckSquare,
+  Square,
+  X
 } from 'lucide-react';
 
 interface Transaction {
@@ -83,6 +86,13 @@ export default function TransactionsPage() {
     transaction_date: '',
     account_id: ''
   });
+
+  // Seleção múltipla
+  const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [showBulkAccountModal, setShowBulkAccountModal] = useState(false);
+  const [bulkAccountId, setBulkAccountId] = useState('');
 
   // Modal de resultado do upload
   const [resultModal, setResultModal] = useState<{
@@ -563,6 +573,82 @@ export default function TransactionsPage() {
       transaction_date: '',
       account_id: ''
     });
+  };
+
+  // Funções de seleção múltipla
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode);
+    if (isSelectionMode) {
+      setSelectedTransactions(new Set());
+    }
+  };
+
+  const toggleTransactionSelection = (transactionId: string) => {
+    const newSelection = new Set(selectedTransactions);
+    if (newSelection.has(transactionId)) {
+      newSelection.delete(transactionId);
+    } else {
+      newSelection.add(transactionId);
+    }
+    setSelectedTransactions(newSelection);
+  };
+
+  const selectAllTransactions = () => {
+    const allIds = new Set(transactions.map(t => t.id));
+    setSelectedTransactions(allIds);
+  };
+
+  const clearSelection = () => {
+    setSelectedTransactions(new Set());
+  };
+
+  const handleBulkAccountUpdate = async () => {
+    if (!user || selectedTransactions.size === 0 || !bulkAccountId) {
+      alert('Selecione pelo menos uma transação e uma conta');
+      return;
+    }
+
+    setBulkUpdating(true);
+    try {
+      const transactionIds = Array.from(selectedTransactions);
+      
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+          account_id: bulkAccountId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id)
+        .in('id', transactionIds);
+
+      if (error) throw error;
+
+      // Limpar seleção e recarregar
+      setSelectedTransactions(new Set());
+      setIsSelectionMode(false);
+      setShowBulkAccountModal(false);
+      setBulkAccountId('');
+      loadTransactions();
+
+      setResultModal({
+        isOpen: true,
+        type: 'success',
+        title: 'Contas Atualizadas!',
+        message: `${transactionIds.length} transação${transactionIds.length !== 1 ? 'ões' : ''} atualizada${transactionIds.length !== 1 ? 's' : ''} com sucesso!`,
+        details: 'As contas foram alteradas para a conta selecionada.'
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar contas em massa:', error);
+      setResultModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Erro ao Atualizar',
+        message: 'Erro ao atualizar contas das transações.',
+        details: 'Tente novamente ou entre em contato com o suporte.'
+      });
+    } finally {
+      setBulkUpdating(false);
+    }
   };
 
   const exportToCSV = () => {
@@ -1082,6 +1168,70 @@ export default function TransactionsPage() {
                 className="bg-error-500 hover:bg-error-600"
               >
                 Excluir
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal: Alterar Conta em Massa */}
+      {showBulkAccountModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-sm z-50">
+          <Card className="max-w-md w-full">
+            <h3 className="text-h4 font-bold text-neutral-900 mb-lg">
+              Alterar Conta de {selectedTransactions.size} Transação{selectedTransactions.size !== 1 ? 'ões' : ''}
+            </h3>
+            
+            <div className="space-y-md">
+              <p className="text-body text-neutral-700">
+                Selecione a conta para aplicar às transações selecionadas:
+              </p>
+
+              {accounts.length > 0 ? (
+                <div>
+                  <label className="block text-small font-medium text-neutral-700 mb-xs">
+                    Conta <span className="text-error-500">*</span>
+                  </label>
+                  <select
+                    value={bulkAccountId}
+                    onChange={(e) => setBulkAccountId(e.target.value)}
+                    className="w-full h-12 px-sm rounded-base border border-neutral-200 focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Selecione uma conta</option>
+                    {accounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.nickname} - {account.institution}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <p className="text-small text-neutral-600">
+                  Nenhuma conta disponível. Crie uma conta primeiro.
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-sm mt-lg pt-lg border-t border-neutral-200">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowBulkAccountModal(false);
+                  setBulkAccountId('');
+                }}
+                fullWidth
+                disabled={bulkUpdating}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleBulkAccountUpdate}
+                fullWidth
+                loading={bulkUpdating}
+                disabled={bulkUpdating || !bulkAccountId}
+              >
+                Atualizar {selectedTransactions.size} Transação{selectedTransactions.size !== 1 ? 'ões' : ''}
               </Button>
             </div>
           </Card>
