@@ -1440,8 +1440,19 @@ export default function TransactionsPage() {
             </div>
 
             <div className="space-y-lg">
-              {Array.from(duplicates.entries()).map(([key, group]) => {
-                const [normalizedDesc, amountStr] = key.split('|');
+              {duplicates.size === 0 ? (
+                <div className="text-center py-xl">
+                  <CheckCircle className="w-16 h-16 text-success-500 mx-auto mb-md" />
+                  <p className="text-body font-semibold text-neutral-900 mb-xs">
+                    Nenhuma duplicata encontrada
+                  </p>
+                  <p className="text-small text-neutral-600">
+                    Todas as transações são únicas (mesma data, descrição e valor)
+                  </p>
+                </div>
+              ) : (
+                Array.from(duplicates.entries()).map(([key, group]) => {
+                const [date, normalizedDesc, amountStr] = key.split('|');
                 const amount = parseFloat(amountStr);
                 const firstTransaction = group[0];
                 
@@ -1453,6 +1464,10 @@ export default function TransactionsPage() {
                           {firstTransaction.description}
                         </p>
                         <div className="flex items-center gap-xs flex-wrap">
+                          <span className="text-small text-neutral-500">
+                            Data: {formatDate(date)}
+                          </span>
+                          <span className="text-neutral-300">•</span>
                           <span className="text-small text-neutral-500">
                             Valor: {formatCurrency(amount)}
                           </span>
