@@ -9,7 +9,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { ResultModal } from '../components/ui/Modal';
-import { Calendar } from '../components/ui/Calendar';
+import { MonthPicker } from '../components/ui/Calendar';
 import {
   Upload,
   Download,
@@ -692,7 +692,7 @@ export default function TransactionsPage() {
             </div>
           </div>
           
-          <Calendar
+          <MonthPicker
             value={filterMonth}
             onChange={(value) => {
               console.log(`📅 Filtro de mês alterado para: ${value}`);
@@ -864,6 +864,7 @@ export default function TransactionsPage() {
                   >
                     <option value="despesa">Despesa</option>
                     <option value="receita">Receita</option>
+                    <option value="transferencia">Transferência</option>
                   </select>
                 </div>
 
@@ -954,6 +955,7 @@ export default function TransactionsPage() {
                   >
                     <option value="despesa">Despesa</option>
                     <option value="receita">Receita</option>
+                    <option value="transferencia">Transferência</option>
                   </select>
                 </div>
 

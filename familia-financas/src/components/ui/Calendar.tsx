@@ -1,4 +1,4 @@
-// Calendar Component - Month/Year Picker
+// MonthPicker Component - Month/Year Picker
 import { useState } from 'react';
 import { format, startOfMonth, endOfMonth, eachMonthOfInterval, getYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -6,13 +6,13 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-reac
 import * as Popover from '@radix-ui/react-popover';
 import { Button } from './Button';
 
-interface CalendarProps {
+interface MonthPickerProps {
   value: string; // YYYY-MM format
   onChange: (value: string) => void;
   className?: string;
 }
 
-export function Calendar({ value, onChange, className = '' }: CalendarProps) {
+export function MonthPicker({ value, onChange, className = '' }: MonthPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const selectedDate = value ? new Date(value + '-01') : new Date();
   const [currentYear, setCurrentYear] = useState(getYear(selectedDate));
