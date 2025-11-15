@@ -812,7 +812,64 @@ export default function TransactionsPage() {
             <p className="text-h4 font-bold text-error-700">{formatCurrency(totalExpenses)}</p>
           </div>
         </div>
+
+        {/* Botão de seleção múltipla */}
+        <div className="mt-md pt-md border-t border-neutral-200">
+          <Button
+            variant={isSelectionMode ? 'primary' : 'outline'}
+            size="sm"
+            onClick={toggleSelectionMode}
+            className="w-full md:w-auto"
+          >
+            {isSelectionMode ? (
+              <>
+                <X className="w-4 h-4" />
+                Cancelar Seleção
+              </>
+            ) : (
+              <>
+                <CheckSquare className="w-4 h-4" />
+                Selecionar Transações
+              </>
+            )}
+          </Button>
+        </div>
       </Card>
+
+      {/* Barra de ações em massa (quando há seleção) */}
+      {isSelectionMode && selectedTransactions.size > 0 && (
+        <Card className="mb-lg bg-primary-50 border-primary-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-md">
+              <span className="text-body font-semibold text-primary-900">
+                {selectedTransactions.size} transação{selectedTransactions.size !== 1 ? 'ões' : ''} selecionada{selectedTransactions.size !== 1 ? 's' : ''}
+              </span>
+              <button
+                onClick={selectAllTransactions}
+                className="text-small text-primary-600 hover:text-primary-700 underline"
+              >
+                Selecionar todas
+              </button>
+              <button
+                onClick={clearSelection}
+                className="text-small text-primary-600 hover:text-primary-700 underline"
+              >
+                Limpar seleção
+              </button>
+            </div>
+            <div className="flex items-center gap-sm">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setShowBulkAccountModal(true)}
+                disabled={selectedTransactions.size === 0}
+              >
+                Alterar Conta
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Lista de Transações */}
       <Card>
@@ -822,11 +879,29 @@ export default function TransactionsPage() {
 
         {filteredTransactions.length > 0 ? (
           <div className="space-y-xs">
-            {filteredTransactions.map((transaction) => (
+            {filteredTransactions.map((transaction) => {
+              const isSelected = selectedTransactions.has(transaction.id);
+              
+              return (
               <div
                 key={transaction.id}
-                className="flex items-center gap-md p-md rounded-base bg-neutral-50 hover:bg-neutral-100 transition-colors"
+                className={`
+                  flex items-center gap-md p-md rounded-base transition-colors border
+                  ${isSelected ? 'border-primary-500 bg-primary-50' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}
+                  ${isSelectionMode ? 'cursor-pointer' : ''}
+                `}
+                onClick={() => isSelectionMode && toggleTransactionSelection(transaction.id)}
               >
+                {/* Checkbox de seleção */}
+                {isSelectionMode && (
+                  <div className="flex-shrink-0">
+                    {isSelected ? (
+                      <CheckSquare className="w-5 h-5 text-primary-600" />
+                    ) : (
+                      <Square className="w-5 h-5 text-neutral-400" />
+                    )}
+                  </div>
+                )}
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
                     transaction.transaction_type === 'receita'
