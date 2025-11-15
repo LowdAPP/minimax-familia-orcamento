@@ -1150,7 +1150,7 @@ export default function TransactionsPage() {
                 </button>
               </div>
             </div>
-            <div className="w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row gap-sm w-full sm:w-auto">
               <Button
                 variant="primary"
                 size="sm"
@@ -1160,6 +1160,16 @@ export default function TransactionsPage() {
                 className="sm:w-auto"
               >
                 Alterar Conta
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setShowBulkCategoryModal(true)}
+                disabled={selectedTransactions.size === 0}
+                fullWidth
+                className="sm:w-auto"
+              >
+                Alterar Categoria
               </Button>
             </div>
           </div>
