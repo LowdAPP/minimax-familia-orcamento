@@ -25,7 +25,8 @@ import {
   Pencil,
   CheckSquare,
   Square,
-  X
+  X,
+  AlertTriangle
 } from 'lucide-react';
 
 interface Transaction {
@@ -97,6 +98,12 @@ export default function TransactionsPage() {
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [showBulkAccountModal, setShowBulkAccountModal] = useState(false);
   const [bulkAccountId, setBulkAccountId] = useState('');
+
+  // Duplicatas
+  const [duplicates, setDuplicates] = useState<Map<string, Transaction[]>>(new Map());
+  const [showDuplicatesModal, setShowDuplicatesModal] = useState(false);
+  const [selectedDuplicates, setSelectedDuplicates] = useState<Set<string>>(new Set());
+  const [deletingDuplicates, setDeletingDuplicates] = useState(false);
 
   // Modal de resultado do upload
   const [resultModal, setResultModal] = useState<{
@@ -682,6 +689,77 @@ export default function TransactionsPage() {
       });
     } finally {
       setBulkUpdating(false);
+    }
+  };
+
+  // Função para detectar transações duplicadas
+  const detectDuplicates = (transactionsList: Transaction[]) => {
+    const duplicatesMap = new Map<string, Transaction[]>();
+    
+    // Agrupar por descrição normalizada e valor
+    const grouped = new Map<string, Transaction[]>();
+    
+    transactionsList.forEach(transaction => {
+      // Normalizar descrição (lowercase, trim)
+      const normalizedDesc = transaction.description.toLowerCase().trim();
+      // Criar chave única: descrição + valor absoluto
+      const key = `${normalizedDesc}|${Math.abs(transaction.amount).toFixed(2)}`;
+      
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
+      }
+      grouped.get(key)!.push(transaction);
+    });
+    
+    // Filtrar apenas grupos com mais de 1 transação (duplicatas)
+    grouped.forEach((group, key) => {
+      if (group.length > 1) {
+        duplicatesMap.set(key, group);
+      }
+    });
+    
+    setDuplicates(duplicatesMap);
+  };
+
+  // Função para deletar duplicatas selecionadas
+  const handleDeleteDuplicates = async () => {
+    if (!user || selectedDuplicates.size === 0) return;
+    
+    setDeletingDuplicates(true);
+    try {
+      const transactionIds = Array.from(selectedDuplicates);
+      
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('user_id', user.id)
+        .in('id', transactionIds);
+
+      if (error) throw error;
+
+      // Limpar seleção e recarregar
+      setSelectedDuplicates(new Set());
+      setShowDuplicatesModal(false);
+      await loadTransactions();
+
+      setResultModal({
+        isOpen: true,
+        type: 'success',
+        title: 'Duplicatas Removidas!',
+        message: `${transactionIds.length} transação${transactionIds.length !== 1 ? 'ões' : ''} removida${transactionIds.length !== 1 ? 's' : ''} com sucesso!`,
+        details: 'As transações duplicadas foram excluídas.'
+      });
+    } catch (error) {
+      console.error('Erro ao deletar duplicatas:', error);
+      setResultModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Erro ao Remover',
+        message: 'Erro ao remover transações duplicadas.',
+        details: 'Tente novamente ou entre em contato com o suporte.'
+      });
+    } finally {
+      setDeletingDuplicates(false);
     }
   };
 
@@ -1291,6 +1369,199 @@ export default function TransactionsPage() {
               >
                 Salvar Alterações
               </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal: Duplicatas */}
+      {showDuplicatesModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-sm z-50 overflow-y-auto"
+          onClick={() => setShowDuplicatesModal(false)}
+        >
+          <Card 
+            className="max-w-4xl w-full m-sm max-h-[90vh] overflow-y-auto"
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-lg">
+              <div>
+                <h3 className="text-body md:text-h4 font-bold text-neutral-900">
+                  Transações Duplicadas
+                </h3>
+                <p className="text-small text-neutral-600 mt-xs">
+                  Selecione as transações duplicadas que deseja remover
+                </p>
+              </div>
+              <button
+                onClick={() => setShowDuplicatesModal(false)}
+                className="p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-base transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-lg">
+              {Array.from(duplicates.entries()).map(([key, group]) => {
+                const [normalizedDesc, amountStr] = key.split('|');
+                const amount = parseFloat(amountStr);
+                const firstTransaction = group[0];
+                
+                return (
+                  <div key={key} className="border border-neutral-200 rounded-base p-md">
+                    <div className="flex items-center justify-between mb-md">
+                      <div className="flex-1">
+                        <p className="text-body font-semibold text-neutral-900 mb-xs">
+                          {firstTransaction.description}
+                        </p>
+                        <div className="flex items-center gap-xs flex-wrap">
+                          <span className="text-small text-neutral-500">
+                            Valor: {formatCurrency(amount)}
+                          </span>
+                          <span className="text-neutral-300">•</span>
+                          <span className="text-small text-neutral-500">
+                            {group.length} duplicata{group.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const allIds = new Set(group.map(t => t.id));
+                          if (Array.from(selectedDuplicates).some(id => allIds.has(id))) {
+                            // Desmarcar todas deste grupo
+                            setSelectedDuplicates(prev => {
+                              const newSet = new Set(prev);
+                              allIds.forEach(id => newSet.delete(id));
+                              return newSet;
+                            });
+                          } else {
+                            // Marcar todas deste grupo (exceto a primeira)
+                            setSelectedDuplicates(prev => {
+                              const newSet = new Set(prev);
+                              group.slice(1).forEach(t => newSet.add(t.id));
+                              return newSet;
+                            });
+                          }
+                        }}
+                        className="text-small text-primary-600 hover:text-primary-700 underline"
+                      >
+                        {Array.from(selectedDuplicates).some(id => group.slice(1).some(t => t.id === id))
+                          ? 'Desmarcar grupo'
+                          : 'Selecionar duplicatas (manter primeira)'}
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-xs">
+                      {group.map((transaction, index) => {
+                        const isSelected = selectedDuplicates.has(transaction.id);
+                        const isFirst = index === 0;
+                        
+                        return (
+                          <div
+                            key={transaction.id}
+                            className={`
+                              flex items-center gap-sm p-sm rounded-base border transition-colors
+                              ${isSelected ? 'border-primary-500 bg-primary-50' : 'border-neutral-200 bg-neutral-50'}
+                              ${isFirst ? 'border-success-300 bg-success-50' : ''}
+                            `}
+                          >
+                            <button
+                              onClick={() => {
+                                if (isFirst) return; // Não permitir selecionar a primeira
+                                setSelectedDuplicates(prev => {
+                                  const newSet = new Set(prev);
+                                  if (newSet.has(transaction.id)) {
+                                    newSet.delete(transaction.id);
+                                  } else {
+                                    newSet.add(transaction.id);
+                                  }
+                                  return newSet;
+                                });
+                              }}
+                              disabled={isFirst}
+                              className="flex-shrink-0"
+                            >
+                              {isFirst ? (
+                                <CheckCircle className="w-5 h-5 text-success-600" title="Esta transação será mantida" />
+                              ) : isSelected ? (
+                                <CheckSquare className="w-5 h-5 text-primary-600" />
+                              ) : (
+                                <Square className="w-5 h-5 text-neutral-400" />
+                              )}
+                            </button>
+                            
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-xs">
+                                {isFirst && (
+                                  <span className="text-xs px-xs py-0.5 bg-success-100 text-success-700 rounded font-medium">
+                                    MANTER
+                                  </span>
+                                )}
+                                <span className="text-small text-neutral-500">
+                                  {formatDate(transaction.transaction_date)}
+                                </span>
+                                {transaction.account_name && (
+                                  <>
+                                    <span className="text-neutral-300">•</span>
+                                    <span className="text-small text-neutral-600">
+                                      {transaction.account_name}
+                                    </span>
+                                  </>
+                                )}
+                                <span className="text-neutral-300">•</span>
+                                <span className="text-small text-neutral-500 capitalize">
+                                  {transaction.source === 'manual' ? 'Manual' : transaction.source === 'pdf_import' ? 'PDF' : 'API'}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <div className="text-right flex-shrink-0">
+                              <p className={`text-small font-semibold ${
+                                transaction.transaction_type === 'receita' ? 'text-success-600' : 'text-error-600'
+                              }`}>
+                                {transaction.transaction_type === 'receita' ? '+' : '-'}
+                                {formatCurrency(Math.abs(transaction.amount))}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-sm mt-lg pt-lg border-t border-neutral-200">
+              <p className="text-small text-neutral-600">
+                {selectedDuplicates.size > 0 
+                  ? `${selectedDuplicates.size} transação${selectedDuplicates.size !== 1 ? 'ões' : ''} selecionada${selectedDuplicates.size !== 1 ? 's' : ''} para remoção`
+                  : 'Selecione as transações duplicadas que deseja remover'}
+              </p>
+              <div className="flex gap-sm w-full sm:w-auto">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setShowDuplicatesModal(false);
+                    setSelectedDuplicates(new Set());
+                  }}
+                  fullWidth
+                  className="sm:w-auto"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleDeleteDuplicates}
+                  disabled={selectedDuplicates.size === 0 || deletingDuplicates}
+                  loading={deletingDuplicates}
+                  fullWidth
+                  className="sm:w-auto"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Remover Selecionadas ({selectedDuplicates.size})
+                </Button>
+              </div>
             </div>
           </Card>
         </div>
