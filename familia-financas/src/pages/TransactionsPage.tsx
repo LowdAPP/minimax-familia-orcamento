@@ -221,7 +221,13 @@ export default function TransactionsPage() {
       .eq('user_id', user.id)
       .eq('is_active', true);
 
-    setAccounts(data || []);
+    const accountsData = data || [];
+    setAccounts(accountsData);
+    
+    // Se não houver conta selecionada e houver contas disponíveis, selecionar a primeira
+    if (!selectedAccountForUpload && accountsData.length > 0) {
+      setSelectedAccountForUpload(accountsData[0].id);
+    }
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
