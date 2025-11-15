@@ -718,19 +718,20 @@ export default function TransactionsPage() {
   return (
     <div className="space-y-lg">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-md">
+      <div className="flex flex-col gap-md">
         <div>
-          <h1 className="text-h2 font-bold text-neutral-900">Transações</h1>
-          <p className="text-body text-neutral-600 mt-xs">
+          <h1 className="text-h2 md:text-h1 font-bold text-neutral-900">Transações</h1>
+          <p className="text-small md:text-body text-neutral-600 mt-xs">
             Gerencie suas movimentações financeiras
           </p>
         </div>
-        <div className="flex gap-sm">
-          <Button variant="secondary" onClick={exportToCSV}>
+        <div className="flex flex-col sm:flex-row gap-sm">
+          <Button variant="secondary" onClick={exportToCSV} fullWidth className="sm:w-auto">
             <Download className="w-4 h-4" />
-            Exportar CSV
+            <span className="hidden sm:inline">Exportar CSV</span>
+            <span className="sm:hidden">Exportar</span>
           </Button>
-          <Button variant="primary" onClick={() => setShowAddModal(true)}>
+          <Button variant="primary" onClick={() => setShowAddModal(true)} fullWidth className="sm:w-auto">
             <Plus className="w-4 h-4" />
             Nova Transação
           </Button>
@@ -739,17 +740,17 @@ export default function TransactionsPage() {
 
       {/* Upload PDF */}
       <Card>
-        <div className="flex flex-col md:flex-row items-start md:items-center gap-md">
+        <div className="flex flex-col gap-md">
           <div className="flex-1">
-            <h3 className="text-h4 font-bold text-neutral-900 mb-xs">
+            <h3 className="text-body md:text-h4 font-bold text-neutral-900 mb-xs">
               Importar Extrato Bancário
             </h3>
             <p className="text-small text-neutral-600">
               Faça upload do PDF do seu banco para importação automática de transações
             </p>
           </div>
-          <div className="flex-shrink-0">
-            <label htmlFor="pdf-upload">
+          <div className="w-full sm:w-auto">
+            <label htmlFor="pdf-upload" className="block w-full sm:w-auto">
               <input
                 id="pdf-upload"
                 type="file"
@@ -763,6 +764,8 @@ export default function TransactionsPage() {
                 as="span"
                 loading={uploading}
                 disabled={uploading}
+                fullWidth
+                className="sm:w-auto"
               >
                 <Upload className="w-4 h-4" />
                 {uploading ? 'Processando...' : 'Selecionar PDF'}
@@ -772,7 +775,7 @@ export default function TransactionsPage() {
         </div>
         {uploadProgress && (
           <div className="mt-md p-sm bg-info-50 border border-info-200 rounded-base">
-            <p className="text-small text-info-700">{uploadProgress}</p>
+            <p className="text-small text-info-700 break-words">{uploadProgress}</p>
           </div>
         )}
       </Card>
@@ -847,17 +850,20 @@ export default function TransactionsPage() {
             variant={isSelectionMode ? 'primary' : 'outline'}
             size="sm"
             onClick={toggleSelectionMode}
-            className="w-full md:w-auto"
+            fullWidth
+            className="sm:w-auto"
           >
             {isSelectionMode ? (
               <>
                 <X className="w-4 h-4" />
-                Cancelar Seleção
+                <span className="hidden sm:inline">Cancelar Seleção</span>
+                <span className="sm:hidden">Cancelar</span>
               </>
             ) : (
               <>
                 <CheckSquare className="w-4 h-4" />
-                Selecionar Transações
+                <span className="hidden sm:inline">Selecionar Transações</span>
+                <span className="sm:hidden">Selecionar</span>
               </>
             )}
           </Button>
@@ -867,30 +873,35 @@ export default function TransactionsPage() {
       {/* Barra de ações em massa (quando há seleção) */}
       {isSelectionMode && selectedTransactions.size > 0 && (
         <Card className="mb-lg bg-primary-50 border-primary-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-md">
-              <span className="text-body font-semibold text-primary-900">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-xs sm:gap-md">
+              <span className="text-small sm:text-body font-semibold text-primary-900">
                 {selectedTransactions.size} transação{selectedTransactions.size !== 1 ? 'ões' : ''} selecionada{selectedTransactions.size !== 1 ? 's' : ''}
               </span>
-              <button
-                onClick={selectAllTransactions}
-                className="text-small text-primary-600 hover:text-primary-700 underline"
-              >
-                Selecionar todas
-              </button>
-              <button
-                onClick={clearSelection}
-                className="text-small text-primary-600 hover:text-primary-700 underline"
-              >
-                Limpar seleção
-              </button>
+              <div className="flex items-center gap-sm">
+                <button
+                  onClick={selectAllTransactions}
+                  className="text-small text-primary-600 hover:text-primary-700 underline"
+                >
+                  Selecionar todas
+                </button>
+                <span className="text-neutral-300">•</span>
+                <button
+                  onClick={clearSelection}
+                  className="text-small text-primary-600 hover:text-primary-700 underline"
+                >
+                  Limpar
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-sm">
+            <div className="w-full sm:w-auto">
               <Button
                 variant="primary"
                 size="sm"
                 onClick={() => setShowBulkAccountModal(true)}
                 disabled={selectedTransactions.size === 0}
+                fullWidth
+                className="sm:w-auto"
               >
                 Alterar Conta
               </Button>
@@ -901,7 +912,7 @@ export default function TransactionsPage() {
 
       {/* Lista de Transações */}
       <Card>
-        <h3 className="text-h4 font-bold text-neutral-900 mb-md">
+        <h3 className="text-body md:text-h4 font-bold text-neutral-900 mb-md">
           Todas as Transações ({filteredTransactions.length})
         </h3>
 
@@ -914,119 +925,125 @@ export default function TransactionsPage() {
               <div
                 key={transaction.id}
                 className={`
-                  flex items-center gap-md p-md rounded-base transition-colors border
+                  flex flex-col sm:flex-row sm:items-center gap-sm sm:gap-md p-sm sm:p-md rounded-base transition-colors border
                   ${isSelected ? 'border-primary-500 bg-primary-50' : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100'}
                   ${isSelectionMode ? 'cursor-pointer' : ''}
                 `}
                 onClick={() => isSelectionMode && toggleTransactionSelection(transaction.id)}
               >
-                {/* Checkbox de seleção */}
-                {isSelectionMode && (
-                  <div className="flex-shrink-0">
-                    {isSelected ? (
-                      <CheckSquare className="w-5 h-5 text-primary-600" />
-                    ) : (
-                      <Square className="w-5 h-5 text-neutral-400" />
-                    )}
-                  </div>
-                )}
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    transaction.transaction_type === 'receita'
-                      ? 'bg-success-100 text-success-600'
-                      : 'bg-error-100 text-error-600'
-                  }`}
-                >
-                  <DollarSign className="w-5 h-5" />
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className="text-body font-semibold text-neutral-900 truncate">
-                    {transaction.description}
-                  </p>
-                  <div className="flex items-center gap-xs mt-xs flex-wrap">
-                    <span className="text-small text-neutral-500">
-                      {formatDate(transaction.transaction_date)}
-                    </span>
-                    {transaction.account_name && (
-                      <>
-                        <span className="text-neutral-300">•</span>
-                        <span className="text-small text-neutral-600 font-medium">
-                          {transaction.account_name}
-                        </span>
-                      </>
-                    )}
-                    {transaction.category_name && (
-                      <>
-                        <span className="text-neutral-300">•</span>
-                        <span
-                          className="text-small px-xs py-0.5 rounded"
-                          style={{
-                            backgroundColor: transaction.category_color + '20',
-                            color: transaction.category_color || '#666'
-                          }}
-                        >
-                          {transaction.category_name}
-                        </span>
-                      </>
-                    )}
-                    <span className="text-neutral-300">•</span>
-                    <span className="text-small text-neutral-500 capitalize">
-                      {transaction.source === 'manual' ? 'Manual' : transaction.source === 'pdf_import' ? 'PDF' : 'API'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-md flex-shrink-0">
-                  <div className="text-right">
-                    <p
-                      className={`text-body-large font-bold ${
-                        transaction.transaction_type === 'receita'
-                          ? 'text-success-600'
-                          : 'text-error-600'
-                      }`}
-                    >
-                      {transaction.transaction_type === 'receita' ? '+' : '-'}
-                      {formatCurrency(Math.abs(transaction.amount))}
-                    </p>
-                    <div className="flex items-center justify-end gap-xs mt-xs">
-                      {transaction.status === 'confirmed' ? (
-                        <CheckCircle className="w-4 h-4 text-success-500" />
-                      ) : transaction.status === 'pending' ? (
-                        <FileText className="w-4 h-4 text-warning-500" />
+                {/* Primeira linha: Checkbox, ícone, descrição e valor */}
+                <div className="flex items-center gap-sm sm:gap-md flex-1 min-w-0">
+                  {/* Checkbox de seleção */}
+                  {isSelectionMode && (
+                    <div className="flex-shrink-0">
+                      {isSelected ? (
+                        <CheckSquare className="w-5 h-5 text-primary-600" />
                       ) : (
-                        <XCircle className="w-4 h-4 text-error-500" />
+                        <Square className="w-5 h-5 text-neutral-400" />
                       )}
-                      <span className="text-small text-neutral-500 capitalize">
-                        {transaction.status === 'confirmed' ? 'Confirmada' : transaction.status === 'pending' ? 'Pendente' : 'Cancelada'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {!isSelectionMode && (
-                    <div className="flex items-center gap-xs">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditClick(transaction);
-                        }}
-                        className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-base transition-colors"
-                        title="Editar transação"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteClick(transaction);
-                        }}
-                        className="p-2 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-base transition-colors"
-                        title="Excluir transação"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </div>
                   )}
+                  <div
+                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      transaction.transaction_type === 'receita'
+                        ? 'bg-success-100 text-success-600'
+                        : 'bg-error-100 text-error-600'
+                    }`}
+                  >
+                    <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <p className="text-small sm:text-body font-semibold text-neutral-900 truncate">
+                      {transaction.description}
+                    </p>
+                    <div className="flex items-center gap-xs mt-xs flex-wrap">
+                      <span className="text-xs sm:text-small text-neutral-500">
+                        {formatDate(transaction.transaction_date)}
+                      </span>
+                      {transaction.account_name && (
+                        <>
+                          <span className="text-neutral-300">•</span>
+                          <span className="text-xs sm:text-small text-neutral-600 font-medium truncate max-w-[120px] sm:max-w-none">
+                            {transaction.account_name}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-sm sm:gap-md flex-shrink-0">
+                    <div className="text-right">
+                      <p
+                        className={`text-body sm:text-body-large font-bold ${
+                          transaction.transaction_type === 'receita'
+                            ? 'text-success-600'
+                            : 'text-error-600'
+                        }`}
+                      >
+                        {transaction.transaction_type === 'receita' ? '+' : '-'}
+                        {formatCurrency(Math.abs(transaction.amount))}
+                      </p>
+                      <div className="flex items-center justify-end gap-xs mt-xs">
+                        {transaction.status === 'confirmed' ? (
+                          <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-success-500" />
+                        ) : transaction.status === 'pending' ? (
+                          <FileText className="w-3 h-3 sm:w-4 sm:h-4 text-warning-500" />
+                        ) : (
+                          <XCircle className="w-3 h-3 sm:w-4 sm:h-4 text-error-500" />
+                        )}
+                        <span className="text-xs sm:text-small text-neutral-500 capitalize hidden sm:inline">
+                          {transaction.status === 'confirmed' ? 'Confirmada' : transaction.status === 'pending' ? 'Pendente' : 'Cancelada'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {!isSelectionMode && (
+                      <div className="flex items-center gap-xs">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditClick(transaction);
+                          }}
+                          className="p-1.5 sm:p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-base transition-colors"
+                          title="Editar transação"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(transaction);
+                          }}
+                          className="p-1.5 sm:p-2 text-neutral-400 hover:text-error-600 hover:bg-error-50 rounded-base transition-colors"
+                          title="Excluir transação"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Segunda linha: Categoria e fonte (mobile) */}
+                <div className="flex items-center gap-xs flex-wrap sm:hidden pl-11 sm:pl-0">
+                  {transaction.category_name && (
+                    <>
+                      <span
+                        className="text-xs px-xs py-0.5 rounded"
+                        style={{
+                          backgroundColor: transaction.category_color + '20',
+                          color: transaction.category_color || '#666'
+                        }}
+                      >
+                        {transaction.category_name}
+                      </span>
+                      <span className="text-neutral-300">•</span>
+                    </>
+                  )}
+                  <span className="text-xs text-neutral-500 capitalize">
+                    {transaction.source === 'manual' ? 'Manual' : transaction.source === 'pdf_import' ? 'PDF' : 'API'}
+                  </span>
                 </div>
               </div>
               );
@@ -1136,9 +1153,9 @@ export default function TransactionsPage() {
 
       {/* Modal: Editar Transação */}
       {transactionToEdit && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-sm z-50">
-          <Card className="max-w-lg w-full">
-            <h3 className="text-h4 font-bold text-neutral-900 mb-lg">Editar Transação</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-sm z-50 overflow-y-auto">
+          <Card className="max-w-lg w-full m-sm max-h-[90vh] overflow-y-auto">
+            <h3 className="text-body md:text-h4 font-bold text-neutral-900 mb-lg">Editar Transação</h3>
             
             <div className="space-y-md">
               <Input
@@ -1231,11 +1248,11 @@ export default function TransactionsPage() {
       {/* Modal: Confirmação de Exclusão */}
       {transactionToDelete && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-sm z-50"
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-sm z-50 overflow-y-auto"
           onClick={handleDeleteCancel}
         >
           <Card 
-            className="max-w-md w-full"
+            className="max-w-md w-full m-sm"
             onClick={(e: React.MouseEvent) => e.stopPropagation()}
           >
             <div className="flex items-center gap-md mb-lg">
@@ -1296,9 +1313,9 @@ export default function TransactionsPage() {
 
       {/* Modal: Alterar Conta em Massa */}
       {showBulkAccountModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-sm z-50">
-          <Card className="max-w-md w-full">
-            <h3 className="text-h4 font-bold text-neutral-900 mb-lg">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-sm z-50 overflow-y-auto">
+          <Card className="max-w-md w-full m-sm max-h-[90vh] overflow-y-auto">
+            <h3 className="text-body md:text-h4 font-bold text-neutral-900 mb-lg">
               Alterar Conta de {selectedTransactions.size} Transação{selectedTransactions.size !== 1 ? 'ões' : ''}
             </h3>
             
