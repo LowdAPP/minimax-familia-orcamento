@@ -1810,7 +1810,9 @@ export default function TransactionsPage() {
                               className="flex-shrink-0"
                             >
                               {isFirst ? (
-                                <CheckCircle className="w-5 h-5 text-success-600" title="Esta transação será mantida" />
+                                <span title="Esta transação será mantida">
+                                  <CheckCircle className="w-5 h-5 text-success-600" />
+                                </span>
                               ) : isSelected ? (
                                 <CheckSquare className="w-5 h-5 text-primary-600" />
                               ) : (
