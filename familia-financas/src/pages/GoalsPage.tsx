@@ -82,12 +82,43 @@ export default function GoalsPage() {
 
   const [extraPayment, setExtraPayment] = useState(0);
   const [simulationMethod, setSimulationMethod] = useState<'snowball' | 'avalanche'>('snowball');
+  const [dbConnected, setDbConnected] = useState<boolean | null>(null);
+  const [dbError, setDbError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
+      validateConnection();
       loadData();
     }
   }, [user]);
+
+  // Validação de conexão com o banco de dados
+  const validateConnection = async () => {
+    try {
+      // Testa conexão verificando se consegue acessar as tabelas
+      const [goalsTest, debtsTest] = await Promise.all([
+        supabase.from('goals').select('id').limit(1),
+        supabase.from('debts').select('id').limit(1)
+      ]);
+
+      // Verifica se há erros de conexão ou permissão
+      if (goalsTest.error || debtsTest.error) {
+        const error = goalsTest.error || debtsTest.error;
+        setDbConnected(false);
+        setDbError(error.message || 'Erro ao conectar com o banco de dados');
+        console.error('Erro de conexão:', error);
+        return;
+      }
+
+      // Se chegou aqui, a conexão está OK
+      setDbConnected(true);
+      setDbError(null);
+    } catch (error: any) {
+      setDbConnected(false);
+      setDbError(error.message || 'Erro ao validar conexão');
+      console.error('Erro ao validar conexão:', error);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -103,27 +134,53 @@ export default function GoalsPage() {
   const loadGoals = async () => {
     if (!user) return;
 
-    const { data } = await supabase
-      .from('goals')
-      .select('*')
-      .eq('user_id', user.id)
-      .neq('status', 'abandoned')
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('goals')
+        .select('*')
+        .eq('user_id', user.id)
+        .neq('status', 'abandoned')
+        .order('created_at', { ascending: false });
 
-    setGoals(data || []);
+      if (error) {
+        console.error('Erro ao carregar metas:', error);
+        setDbConnected(false);
+        setDbError(`Erro ao carregar metas: ${error.message}`);
+        return;
+      }
+
+      setGoals(data || []);
+    } catch (error: any) {
+      console.error('Erro ao carregar metas:', error);
+      setDbConnected(false);
+      setDbError(error.message || 'Erro ao carregar metas');
+    }
   };
 
   const loadDebts = async () => {
     if (!user) return;
 
-    const { data } = await supabase
-      .from('debts')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('interest_rate', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('debts')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('interest_rate', { ascending: false });
 
-    setDebts(data || []);
+      if (error) {
+        console.error('Erro ao carregar dívidas:', error);
+        setDbConnected(false);
+        setDbError(`Erro ao carregar dívidas: ${error.message}`);
+        return;
+      }
+
+      setDebts(data || []);
+    } catch (error: any) {
+      console.error('Erro ao carregar dívidas:', error);
+      setDbConnected(false);
+      setDbError(error.message || 'Erro ao carregar dívidas');
+    }
   };
 
   const handleAddGoal = async () => {
@@ -143,7 +200,11 @@ export default function GoalsPage() {
         status: 'active'
       });
 
-      if (error) throw error;
+      if (error) {
+        setDbConnected(false);
+        setDbError(`Erro ao adicionar meta: ${error.message}`);
+        throw error;
+      }
 
       setShowGoalModal(false);
       setNewGoal({
@@ -153,10 +214,10 @@ export default function GoalsPage() {
         current_amount: 0,
         deadline: ''
       });
-      loadGoals();
-    } catch (error) {
+      await loadGoals();
+    } catch (error: any) {
       console.error('Erro ao adicionar meta:', error);
-      alert('Erro ao adicionar meta');
+      alert(error.message || 'Erro ao adicionar meta. Verifique a conexão com o banco de dados.');
     }
   };
 
@@ -178,7 +239,11 @@ export default function GoalsPage() {
         is_active: true
       });
 
-      if (error) throw error;
+      if (error) {
+        setDbConnected(false);
+        setDbError(`Erro ao adicionar dívida: ${error.message}`);
+        throw error;
+      }
 
       setShowDebtModal(false);
       setNewDebt({
@@ -189,10 +254,10 @@ export default function GoalsPage() {
         minimum_payment: 0,
         due_date: ''
       });
-      loadDebts();
-    } catch (error) {
+      await loadDebts();
+    } catch (error: any) {
       console.error('Erro ao adicionar dívida:', error);
-      alert('Erro ao adicionar dívida');
+      alert(error.message || 'Erro ao adicionar dívida. Verifique a conexão com o banco de dados.');
     }
   };
 
@@ -301,6 +366,41 @@ export default function GoalsPage() {
 
   return (
     <div className="space-y-lg">
+      {/* Validação de Conexão */}
+      {dbConnected === false && (
+        <Card className="bg-error-50 border-error-200">
+          <div className="flex items-center gap-sm">
+            <AlertTriangle className="w-5 h-5 text-error-600 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-body font-semibold text-error-900">
+                Erro de conexão com o banco de dados
+              </p>
+              <p className="text-small text-error-700 mt-xs">
+                {dbError || 'Não foi possível conectar. Verifique sua conexão e tente novamente.'}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={validateConnection}
+            >
+              Tentar Novamente
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {dbConnected === true && (
+        <Card className="bg-success-50 border-success-200">
+          <div className="flex items-center gap-sm">
+            <CheckCircle className="w-5 h-5 text-success-600 flex-shrink-0" />
+            <p className="text-body text-success-700">
+              Conectado ao banco de dados
+            </p>
+          </div>
+        </Card>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-md">
         <div>
