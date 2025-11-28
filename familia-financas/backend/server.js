@@ -399,9 +399,7 @@ function parseTransactionsFromText(text, userId, accountId, tenantId) {
   // Múltiplos padrões para diferentes formatos de extrato
   const patterns = [
     {
-      name: 'Santander PT - Data Duplicada Sem Espaço',
-      // DD-MM-YYYYDD-MM-YYYY (sem espaço entre datas) seguido de descrição e valor em linhas separadas
-      // Este padrão precisa ser processado linha por linha, não via regex simples
+      name: 'Santander PT - Data Duplicada Sem Espaço (Novo)',
       isLineByLine: true
     },
     {
@@ -431,7 +429,101 @@ function parseTransactionsFromText(text, userId, accountId, tenantId) {
     console.log(`[PARSE] 🔍 Tentando padrão: ${pattern.name}`);
     
     // Padrão especial: Data duplicada sem espaço (formato linha por linha)
-    if (pattern.isLineByLine && pattern.name === 'Santander PT - Data Duplicada Sem Espaço') {
+    if (pattern.isLineByLine && pattern.name === 'Santander PT - Data Duplicada Sem Espaço (Novo)') {
+      const dateDuplicatedPattern = /^(\d{2}-\d{2}-\d{4})(\d{2}-\d{2}-\d{4})$/;
+      const amountPattern = /^([\+\-]?)\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*EUR/;
+      
+      let patternTransactions = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const dateMatch = line.match(dateDuplicatedPattern);
+        
+        if (dateMatch) {
+          const dateStr = dateMatch[1]; // Usa primeira data
+          const transactionDate = parseDate(dateStr);
+          
+          if (!transactionDate) continue;
+          
+          if (i + 1 >= lines.length) continue;
+          let description = lines[i + 1].trim();
+          
+          let amountFound = false;
+          let linesToSkip = 1;
+          
+          for (let j = 1; j <= 3; j++) {
+            if (i + j >= lines.length) break;
+            
+            const potentialAmountLine = lines[i + j].trim();
+            const amountMatch = potentialAmountLine.match(amountPattern);
+            
+            if (amountMatch) {
+              if (j > 1) {
+                 for (let k = 2; k < j; k++) {
+                   description += ' ' + lines[i + k].trim();
+                 }
+              }
+              
+              const signStr = amountMatch[1]; 
+              const valueStr = amountMatch[2];
+              const sign = signStr === '-' ? -1 : 1;
+              const amountValue = parseAmount(valueStr);
+              
+              if (amountValue && amountValue >= 0.01) {
+                const amount = sign * amountValue;
+                
+                description = description.trim().replace(/\s+/g, ' ').replace(/[|\t]/g, ' ').trim();
+                
+                if (description.length >= 3 && description.length <= 500 && 
+                    !/^[\d\s\.\,\-\/\+€\$£EURR\$USD]+$/.test(description)) {
+                      
+                  const lowerDesc = description.toLowerCase();
+                  if (!lowerDesc.includes('disponível') && !lowerDesc.includes('autorizado') &&
+                      !lowerDesc.includes('saldo contabilístico') && 
+                      !(lowerDesc.includes('data') && lowerDesc.includes('tipo'))) {
+                    
+                    const isDuplicate = patternTransactions.some(t =>
+                      t.transaction_date === transactionDate &&
+                      Math.abs(t.amount - amount) < 0.01 &&
+                      t.description === description
+                    );
+
+                    if (!isDuplicate) {
+                      console.log(`[PARSE] ✅ Transação encontrada (Padrão Santander Novo): ${transactionDate} | ${description.substring(0, 30)} | ${amount}`);
+                      patternTransactions.push({
+                        user_id: userId,
+                        account_id: accountId,
+                        tenant_id: tenantId,
+                        transaction_date: transactionDate,
+                        amount: amount,
+                        description: description,
+                        merchant: extractMerchant(description),
+                        transaction_type: amount > 0 ? 'receita' : 'despesa',
+                        status: 'confirmed',
+                        source: 'pdf_import'
+                      });
+                      amountFound = true;
+                      linesToSkip = j;
+                    }
+                  }
+                }
+              }
+              break;
+            }
+          }
+          
+          if (amountFound) {
+            i += linesToSkip; 
+          }
+        }
+      }
+
+      if (patternTransactions.length > 0) {
+        console.log(`[PARSE] ✅ Usando padrão ${pattern.name} - ${patternTransactions.length} transações encontradas`);
+        return patternTransactions;
+      }
+
+    } else if (pattern.isLineByLine && pattern.name === 'Santander PT - Data Duplicada Sem Espaço') {
       const dateDuplicatedPattern = /^(\d{2}-\d{2}-\d{4})(\d{2}-\d{2}-\d{4})$/;
       // Padrão para valor: pode ter espaços entre milhares (ex: "5 935,98 EUR" ou "+ 180,00 EUR")
       const amountPattern = /([\+\-]?)\s*(\d{1,3}(?:\s*\d{3})*,\d{2})\s*EUR/;
