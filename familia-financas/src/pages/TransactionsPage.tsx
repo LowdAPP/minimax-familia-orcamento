@@ -425,12 +425,24 @@ export default function TransactionsPage() {
     const file = event.target.files?.[0];
     if (!file || !user) return;
 
-    if (file.type !== 'application/pdf') {
+    const allowedTypes = [
+      'application/pdf', 
+      'text/csv', 
+      'application/vnd.ms-excel', 
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+    
+    // Validação mais flexível para CSV que às vezes vem como text/plain ou outros
+    const isCSV = file.name.toLowerCase().endsWith('.csv');
+    const isExcel = file.name.toLowerCase().endsWith('.xls') || file.name.toLowerCase().endsWith('.xlsx');
+    const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+    if (!allowedTypes.includes(file.type) && !isCSV && !isExcel && !isPDF) {
       setResultModal({
         isOpen: true,
         type: 'error',
         title: 'Arquivo Inválido',
-        message: 'Por favor, selecione um arquivo PDF válido'
+        message: 'Por favor, selecione um arquivo PDF, CSV ou Excel válido.'
       });
       return;
     }
