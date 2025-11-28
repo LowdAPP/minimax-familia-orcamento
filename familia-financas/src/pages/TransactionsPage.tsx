@@ -1096,6 +1096,21 @@ export default function TransactionsPage() {
             <span className="hidden sm:inline">Exportar CSV</span>
             <span className="sm:hidden">Exportar</span>
           </Button>
+          
+          <Button
+            variant="outline"
+            onClick={handleAutoCategorize}
+            disabled={autoCategorizing}
+            loading={autoCategorizing}
+            fullWidth
+            className="sm:w-auto"
+            title="Categorizar transações antigas automaticamente"
+          >
+            <Wand2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Auto Categorizar</span>
+            <span className="sm:hidden">Auto</span>
+          </Button>
+          
           <Button variant="primary" onClick={() => setShowAddModal(true)} fullWidth className="sm:w-auto">
             <Plus className="w-4 h-4" />
             Nova Transação
