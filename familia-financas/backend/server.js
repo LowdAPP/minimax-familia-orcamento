@@ -737,6 +737,57 @@ function parseTransactionsFromText(text, userId, accountId, tenantId) {
   return transactions;
 }
 
+// Função para verificar duplicatas no banco de dados
+async function checkDuplicatesInDB(transactions, userId) {
+  if (!supabase || transactions.length === 0) return transactions;
+  
+  try {
+    console.log(`[DB] 🔍 Verificando duplicatas no banco para ${transactions.length} transações...`);
+    
+    // Buscar transações existentes do usuário no mesmo período
+    const dates = transactions.map(t => t.transaction_date);
+    const minDate = dates.reduce((a, b) => a < b ? a : b);
+    const maxDate = dates.reduce((a, b) => a > b ? a : b);
+    
+    const { data: existingTransactions, error } = await supabase
+      .from('transactions')
+      .select('transaction_date, description, amount')
+      .eq('user_id', userId)
+      .gte('transaction_date', minDate)
+      .lte('transaction_date', maxDate);
+    
+    if (error) {
+      console.log(`[DB] ⚠️ Erro ao verificar duplicatas: ${error.message}, continuando sem verificação...`);
+      return transactions;
+    }
+    
+    // Criar um Set de chaves para busca rápida
+    const existingKeys = new Set(
+      (existingTransactions || []).map(t => {
+        const normalizedDesc = t.description.toLowerCase().trim();
+        return `${t.transaction_date}|${normalizedDesc}|${Math.abs(t.amount).toFixed(2)}`;
+      })
+    );
+    
+    // Filtrar transações que já existem
+    const newTransactions = transactions.filter(t => {
+      const normalizedDesc = t.description.toLowerCase().trim();
+      const key = `${t.transaction_date}|${normalizedDesc}|${Math.abs(t.amount).toFixed(2)}`;
+      return !existingKeys.has(key);
+    });
+    
+    const duplicatesCount = transactions.length - newTransactions.length;
+    if (duplicatesCount > 0) {
+      console.log(`[DB] 🔄 ${duplicatesCount} transações duplicadas encontradas no banco, ${newTransactions.length} novas para inserir`);
+    }
+    
+    return newTransactions;
+  } catch (err) {
+    console.error('[DB] ❌ Erro ao verificar duplicatas:', err.message);
+    return transactions; // Em caso de erro, tenta inserir todas
+  }
+}
+
 // Função para salvar transações no Supabase
 async function saveTransactionsToSupabase(transactions) {
   if (!supabase) {
@@ -762,16 +813,27 @@ async function saveTransactionsToSupabase(transactions) {
       return { success: false, reason: `${invalidTransactions.length} transações com campos obrigatórios faltando`, inserted: 0 };
     }
     
+    // Verificar duplicatas no banco antes de inserir
+    const userId = transactions[0].user_id;
+    const transactionsToInsert = await checkDuplicatesInDB(transactions, userId);
+    
+    if (transactionsToInsert.length === 0) {
+      console.log(`[DB] ℹ️ Todas as ${transactions.length} transações já existem no banco (duplicatas)`);
+      return { success: true, inserted: 0, reason: 'Todas as transações são duplicadas', duplicates: transactions.length };
+    }
+    
+    console.log(`[DB] 📊 Após verificação de duplicatas: ${transactionsToInsert.length} transações para inserir (${transactions.length - transactionsToInsert.length} duplicadas)`);
+    
     // Usar RPC ou inserção direta com service role
     // Service role key deve bypassar RLS automaticamente
     console.log('[DB] 🔑 Verificando se está usando service role...');
-    console.log('[DB] 📊 Tentando inserir', transactions.length, 'transações');
+    console.log('[DB] 📊 Tentando inserir', transactionsToInsert.length, 'transações');
     
     // Tentar inserção direta primeiro
     // Se falhar com RLS, tentar usar RPC function
     let { data, error } = await supabase
       .from('transactions')
-      .insert(transactions)
+      .insert(transactionsToInsert)
       .select('id');
     
     // Se der erro de RLS, tentar usar função RPC que bypassa RLS
@@ -806,11 +868,13 @@ async function saveTransactionsToSupabase(transactions) {
         console.log('[DB] ⚠️ RPC function não existe, tentando inserção em lote menor...');
         
         // Tentar inserir em lotes menores (às vezes ajuda)
-        const batchSize = 10;
+        const batchSize = 50; // Aumentar tamanho do lote para melhor performance
         const batches = [];
-        for (let i = 0; i < transactions.length; i += batchSize) {
-          batches.push(transactions.slice(i, i + batchSize));
+        for (let i = 0; i < transactionsToInsert.length; i += batchSize) {
+          batches.push(transactionsToInsert.slice(i, i + batchSize));
         }
+        
+        console.log(`[DB] 📦 Dividindo em ${batches.length} lotes de até ${batchSize} transações cada`);
         
         let allData = [];
         let hasError = false;
