@@ -2,12 +2,23 @@
 // Categorização automática de transações usando IA/Pattern Matching
 
 Deno.serve(async (req) => {
+    // Configuração de CORS mais segura
+    const allowedOrigins = [
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'https://familia-financas.vercel.app',
+        'https://minimax-familia-orcamento.vercel.app'
+    ];
+    
+    const origin = req.headers.get('Origin');
+    const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : '*'; // Em dev permitimos *, em prod deve ser restrito
+
     const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': allowOrigin,
         'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
         'Access-Control-Max-Age': '86400',
-        'Access-Control-Allow-Credentials': 'false'
+        'Access-Control-Allow-Credentials': 'true'
     };
 
     if (req.method === 'OPTIONS') {
@@ -30,15 +41,19 @@ Deno.serve(async (req) => {
             throw new Error('Supabase configuration missing');
         }
 
-        // Get user from auth header
-        const authHeader = req.headers.get('authorization');
+        // Validação de Autenticação (JWT)
+        const authHeader = req.headers.get('Authorization');
         if (!authHeader) {
-            throw new Error('No authorization header');
+            return new Response(JSON.stringify({
+                error: {
+                    code: 'AUTH_MISSING',
+                    message: 'Token de autenticação obrigatório'
+                }
+            }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
+        // Validar usuário com Supabase Auth
         const token = authHeader.replace('Bearer ', '');
-
-        // Verify token and get user
         const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -47,11 +62,18 @@ Deno.serve(async (req) => {
         });
 
         if (!userResponse.ok) {
-            throw new Error('Invalid token');
+            return new Response(JSON.stringify({
+                error: {
+                    code: 'AUTH_INVALID',
+                    message: 'Token de autenticação inválido ou expirado'
+                }
+            }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
         const userData = await userResponse.json();
-        const userId = userData.id;
+        // NOTA: Se as transações tivessem user_id, validaríamos aqui se batem.
+        // Como esta função é stateless e apenas categoriza um array de objetos,
+        // a validação de token é suficiente para impedir uso não autorizado da API (consumo de quota).
 
         // Fetch system categories
         const categoriesResponse = await fetch(

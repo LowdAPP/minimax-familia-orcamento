@@ -2,12 +2,23 @@
 import * as pdfjsLib from 'npm:pdfjs-dist@4.0.379';
 
 Deno.serve(async (req) => {
+    // Configuração de CORS mais segura
+    const allowedOrigins = [
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'https://familia-financas.vercel.app',
+        'https://minimax-familia-orcamento.vercel.app'
+    ];
+    
+    const origin = req.headers.get('Origin');
+    const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : '*'; // Em dev permitimos *, em prod deve ser restrito
+
     const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': allowOrigin,
         'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
         'Access-Control-Max-Age': '86400',
-        'Access-Control-Allow-Credentials': 'false'
+        'Access-Control-Allow-Credentials': 'true'
     };
 
     if (req.method === 'OPTIONS') {
@@ -23,12 +34,78 @@ Deno.serve(async (req) => {
             throw new Error('Configuração do Supabase ausente');
         }
 
+        // Validação de Autenticação (JWT)
+        const authHeader = req.headers.get('Authorization');
+        if (!authHeader) {
+            return new Response(JSON.stringify({
+                success: false,
+                errorCode: 'AUTH_MISSING',
+                error: 'Token de autenticação obrigatório'
+            }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
+        // Validar usuário com Supabase Auth
+        const token = authHeader.replace('Bearer ', '');
+        const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'apikey': serviceRoleKey
+            }
+        });
+
+        if (!userResponse.ok) {
+            return new Response(JSON.stringify({
+                success: false,
+                errorCode: 'AUTH_INVALID',
+                error: 'Token de autenticação inválido ou expirado'
+            }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
+        const userData = await userResponse.json();
+        const authenticatedUserId = userData.id;
+
+        // Buscar tenant_id do usuário
+        let tenantId = null;
+        try {
+            // Tentar user_profiles primeiro
+            const profileResponse = await fetch(`${supabaseUrl}/rest/v1/user_profiles?id=eq.${authenticatedUserId}&select=tenant_id`, {
+                headers: {
+                    'Authorization': `Bearer ${serviceRoleKey}`,
+                    'apikey': serviceRoleKey,
+                    'Accept': 'application/json'
+                }
+            });
+            
+            if (profileResponse.ok) {
+                const profiles = await profileResponse.json();
+                if (profiles.length > 0) tenantId = profiles[0].tenant_id;
+            }
+
+            // Se não encontrou, tentar users (fallback)
+            if (!tenantId) {
+                const legacyUserResponse = await fetch(`${supabaseUrl}/rest/v1/users?id=eq.${authenticatedUserId}&select=tenant_id`, {
+                    headers: {
+                        'Authorization': `Bearer ${serviceRoleKey}`,
+                        'apikey': serviceRoleKey,
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (legacyUserResponse.ok) {
+                    const legacyUsers = await legacyUserResponse.json();
+                    if (legacyUsers.length > 0) tenantId = legacyUsers[0].tenant_id;
+                }
+            }
+        } catch (err) {
+            console.error('Erro ao buscar tenant_id:', err);
+        }
+
         // Parse FormData para upload direto
         const formData = await req.formData();
         const file = formData.get('file') as File;
-        const user_id = formData.get('user_id') as string;
+        const requestedUserId = formData.get('user_id') as string;
 
-        if (!file || !user_id) {
+        if (!file || !requestedUserId) {
             return new Response(JSON.stringify({
                 success: false,
                 errorCode: 'MISSING_PARAMS',
@@ -38,6 +115,15 @@ Deno.serve(async (req) => {
                 status: 400,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
+        }
+
+        // Validar se o usuário autenticado corresponde ao user_id solicitado
+        if (authenticatedUserId !== requestedUserId) {
+            return new Response(JSON.stringify({
+                success: false,
+                errorCode: 'AUTH_FORBIDDEN',
+                error: 'Você não tem permissão para processar arquivos para este usuário'
+            }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
         if (!file.type.includes('pdf')) {
@@ -75,7 +161,7 @@ Deno.serve(async (req) => {
         }
 
         // Inserir transações no banco de dados usando Supabase
-        const insertedTransactions = await insertTransactionsToDatabase(finalTransactions, user_id, supabaseUrl, serviceRoleKey);
+        const insertedTransactions = await insertTransactionsToDatabase(finalTransactions, authenticatedUserId, supabaseUrl, serviceRoleKey, tenantId);
 
         console.log('Processamento concluído:', insertedTransactions.length, 'transações inseridas');
 
@@ -424,22 +510,23 @@ function parseTransactions(text: string): Array<any> {
 /**
  * Insere transações no banco de dados Supabase
  */
-async function insertTransactionsToDatabase(transactions: Array<any>, userId: string, supabaseUrl: string, serviceRoleKey: string): Promise<Array<any>> {
+async function insertTransactionsToDatabase(transactions: Array<any>, userId: string, supabaseUrl: string, serviceRoleKey: string, tenantId: string | null): Promise<Array<any>> {
     const insertedTransactions = [];
     
     // Buscar ou criar conta padrão para o usuário
-    const account = await getOrCreateUserAccount(userId, supabaseUrl, serviceRoleKey);
+    const account = await getOrCreateUserAccount(userId, supabaseUrl, serviceRoleKey, tenantId);
     console.log('Usando conta:', account.id, 'para inserção de transações');
     
     for (const transaction of transactions) {
         try {
             // Primeiro, buscar ou criar categoria
-            const category = await getOrCreateCategory(transaction.category, supabaseUrl, serviceRoleKey);
+            const category = await getOrCreateCategory(transaction.category, supabaseUrl, serviceRoleKey, tenantId, userId);
             
             // Preparar dados da transação com TODOS os campos obrigatórios
             const transactionData = {
                 user_id: userId,
                 account_id: account.id,
+                tenant_id: tenantId, // Multitenancy support
                 description: transaction.description,
                 amount: parseFloat(Math.abs(transaction.amount).toFixed(2)),  // Sempre positivo no DB
                 transaction_type: transaction.amount < 0 ? 'despesa' : 'receita',
@@ -461,6 +548,7 @@ async function insertTransactionsToDatabase(transactions: Array<any>, userId: st
                 source: transactionData.source,
                 user_id: transactionData.user_id,
                 account_id: transactionData.account_id,
+                tenant_id: transactionData.tenant_id,
                 category_id: transactionData.category_id
             });
 
@@ -507,7 +595,7 @@ async function insertTransactionsToDatabase(transactions: Array<any>, userId: st
 /**
  * Busca ou cria conta padrão para o usuário
  */
-async function getOrCreateUserAccount(userId: string, supabaseUrl: string, serviceRoleKey: string): Promise<any> {
+async function getOrCreateUserAccount(userId: string, supabaseUrl: string, serviceRoleKey: string, tenantId: string | null): Promise<any> {
     try {
         // Buscar conta existente do usuário
         const searchResponse = await fetch(`${supabaseUrl}/rest/v1/accounts?user_id=eq.${userId}&is_active=eq.true&limit=1`, {
@@ -529,6 +617,7 @@ async function getOrCreateUserAccount(userId: string, supabaseUrl: string, servi
         // Se não encontrou, criar nova conta padrão
         const accountData = {
             user_id: userId,
+            tenant_id: tenantId, // Multitenancy
             account_type: 'conta_corrente',
             nickname: 'Conta Principal',
             institution: 'Banco Importado',
@@ -573,9 +662,9 @@ async function getOrCreateUserAccount(userId: string, supabaseUrl: string, servi
 /**
  * Busca ou cria uma categoria no banco de dados
  */
-async function getOrCreateCategory(categoryName: string, supabaseUrl: string, serviceRoleKey: string): Promise<any> {
+async function getOrCreateCategory(categoryName: string, supabaseUrl: string, serviceRoleKey: string, tenantId: string | null, userId: string): Promise<any> {
     try {
-        // Buscar categoria existente
+        // Buscar categoria existente (do usuário ou do sistema)
         const searchResponse = await fetch(`${supabaseUrl}/rest/v1/categories?name=eq.${encodeURIComponent(categoryName)}`, {
             headers: {
                 'Authorization': `Bearer ${serviceRoleKey}`,
@@ -586,16 +675,24 @@ async function getOrCreateCategory(categoryName: string, supabaseUrl: string, se
         
         if (searchResponse.ok) {
             const categories = await searchResponse.json();
-            if (categories.length > 0) {
-                return categories[0];
+            // Filtrar as que pertencem ao usuário ou são do sistema
+            // A API retorna todas que dão match no nome, mas precisamos garantir que é acessível
+            // No entanto, como estamos com serviceRoleKey, vemos tudo.
+            // Melhor filtrar aqui:
+            const validCategory = categories.find((c: any) => c.is_system_category === true || c.user_id === userId);
+            
+            if (validCategory) {
+                return validCategory;
             }
         }
         
-        // Se não encontrou, criar nova categoria
+        // Se não encontrou, criar nova categoria personalizada para o usuário
         const categoryData = {
             name: categoryName,
+            user_id: userId,
+            tenant_id: tenantId, // Multitenancy
             color: getCategoryColor(categoryName),
-            is_system: false,
+            is_system_category: false,
             created_at: new Date().toISOString()
         };
         
