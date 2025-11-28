@@ -114,6 +114,7 @@ export default function TransactionsPage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [autoCategorizing, setAutoCategorizing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [selectedAccountForUpload, setSelectedAccountForUpload] = useState<string>('');
   
@@ -320,6 +321,53 @@ export default function TransactionsPage() {
       .order('name');
 
     setCategories(data || []);
+  };
+
+  const handleAutoCategorize = async () => {
+    if (!user) return;
+    
+    setAutoCategorizing(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/auto-categorize`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setResultModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Auto-categorização Concluída',
+          message: data.message,
+          details: data.count > 0 
+            ? `Foram categorizadas ${data.count} transações automaticamente com base no seu histórico.`
+            : 'Não foram encontradas novas transações para categorizar ou o histórico é insuficiente.'
+        });
+        
+        // Recarregar transações se houve alterações
+        if (data.count > 0) {
+          loadTransactions();
+        }
+      } else {
+        throw new Error(data.error || 'Erro desconhecido');
+      }
+    } catch (error: any) {
+      console.error('Erro na auto-categorização:', error);
+      setResultModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Erro na Auto-categorização',
+        message: 'Não foi possível categorizar as transações.',
+        details: error.message || 'Tente novamente mais tarde.'
+      });
+    } finally {
+      setAutoCategorizing(false);
+    }
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
