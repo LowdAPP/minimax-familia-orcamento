@@ -79,7 +79,8 @@ import {
   Scissors,
   Wrench,
   Paintbrush,
-  Sparkles
+  Sparkles,
+  Wand2
 } from 'lucide-react';
 
 interface Transaction {
