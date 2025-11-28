@@ -9,13 +9,13 @@ const PORT = process.env.PORT || 3000;
 // IMPORTANTE: Usar SERVICE_ROLE_KEY para bypassar RLS policies
 // O backend precisa inserir transações em nome dos usuários
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+// ATENÇÃO: SERVICE_ROLE_KEY é obrigatória para operação segura do backend
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 let supabase = null;
 
 if (supabaseUrl && supabaseServiceKey) {
   // Verificar se é Service Role Key (começa com 'eyJ' e é mais longa)
-  const isServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY && 
-                        process.env.SUPABASE_SERVICE_ROLE_KEY.length > 100;
+  const isServiceRole = supabaseServiceKey.length > 100;
   
   supabase = createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
@@ -34,16 +34,75 @@ if (supabaseUrl && supabaseServiceKey) {
   });
   
   console.log('[INIT] ✅ Supabase client initialized');
-  console.log('[INIT] 🔑 Using:', isServiceRole ? 'SERVICE_ROLE_KEY ✅' : 'ANON_KEY ⚠️ (fallback - pode não funcionar)');
-  console.log('[INIT] 📍 URL:', supabaseUrl);
-  console.log('[INIT] 🔑 Key length:', supabaseServiceKey ? supabaseServiceKey.length : 0);
+  console.log('[INIT] 📍 URL configured');
   
   if (!isServiceRole) {
-    console.log('[INIT] ⚠️ AVISO: Usando ANON_KEY como fallback. Configure SUPABASE_SERVICE_ROLE_KEY!');
+    console.warn('[INIT] ⚠️ AVISO: A chave configurada parece curta. Certifique-se de usar a SERVICE_ROLE_KEY.');
   }
 } else {
-  console.log('[INIT] ⚠️ Supabase credentials not configured - database saving disabled');
-  console.log('[INIT] ⚠️ Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
+  console.error('[INIT] ❌ ERRO CRÍTICO: Supabase credentials not configured');
+  console.error('[INIT] ❌ Configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY');
+  // Não encerramos o processo para permitir debug, mas as operações de banco falharão
+}
+
+/**
+ * Verifica o token JWT do usuário
+ * @param {string} token - Token JWT Bearer
+ * @returns {Promise<User|null>} - Objeto User do Supabase ou null se inválido
+ */
+async function verifyAuthToken(token) {
+  if (!token || !supabase) return null;
+  
+  try {
+    // Remove 'Bearer ' se presente
+    const cleanToken = token.replace('Bearer ', '');
+    
+    // Usa o client com service role para validar o token do usuário
+    const { data: { user }, error } = await supabase.auth.getUser(cleanToken);
+    
+    if (error || !user) {
+      if (error) console.error('[AUTH] Erro na validação do token:', error.message);
+      return null;
+    }
+    
+    return user;
+  } catch (error) {
+    console.error('[AUTH] Exceção na validação:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Busca o tenant_id do usuário
+ * @param {string} userId 
+ * @returns {Promise<string|null>}
+ */
+async function getUserTenantId(userId) {
+  if (!supabase) return null;
+  try {
+    // 1. Tentar user_profiles (principal)
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('tenant_id')
+      .eq('id', userId)
+      .single();
+      
+    if (profile && profile.tenant_id) return profile.tenant_id;
+    
+    // 2. Tentar users (fallback/legado)
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('tenant_id')
+      .eq('id', userId)
+      .single();
+      
+    if (user && user.tenant_id) return user.tenant_id;
+    
+    return null;
+  } catch (error) {
+    console.error('[AUTH] Erro ao buscar tenant_id:', error.message);
+    return null;
+  }
 }
 
 // Função para parsear multipart/form-data
@@ -329,11 +388,12 @@ function extractMerchant(description) {
 }
 
 // Função para extrair transações do texto do PDF
-function parseTransactionsFromText(text, userId, accountId) {
+function parseTransactionsFromText(text, userId, accountId, tenantId) {
   const transactions = [];
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
   console.log(`[PARSE] 📄 Analisando ${lines.length} linhas de texto...`);
+  console.log(`[PARSE] 🏢 Tenant ID: ${tenantId || 'N/A (Global)'}`);
   console.log(`[PARSE] 📝 Primeiras 5 linhas:`, lines.slice(0, 5));
 
   // Múltiplos padrões para diferentes formatos de extrato
@@ -436,6 +496,7 @@ function parseTransactionsFromText(text, userId, accountId) {
             transactions.push({
               user_id: userId,
               account_id: accountId,
+              tenant_id: tenantId, // Adicionado suporte a multitenancy
               transaction_date: transactionDate,
               amount: amount,
               description: description,
@@ -541,6 +602,7 @@ function parseTransactionsFromText(text, userId, accountId) {
           transactions.push({
             user_id: userId,
             account_id: accountId,
+            tenant_id: tenantId, // Adicionado suporte a multitenancy
             transaction_date: transactionDate,
             amount: amount,
             description: description,
@@ -658,6 +720,7 @@ function parseTransactionsFromText(text, userId, accountId) {
         transactions.push({
           user_id: userId,
           account_id: accountId,
+          tenant_id: tenantId, // Adicionado suporte a multitenancy
           transaction_date: transactionDate,
           amount: amount,
           description: description,
@@ -720,6 +783,7 @@ async function saveTransactionsToSupabase(transactions) {
       const transactionsJsonb = transactions.map(t => ({
         user_id: t.user_id,
         account_id: t.account_id,
+        tenant_id: t.tenant_id || null,
         category_id: t.category_id || null,
         transaction_date: t.transaction_date,
         amount: t.amount.toString(),
@@ -796,6 +860,7 @@ async function saveTransactionsToSupabase(transactions) {
           const transactionsJsonb = transactions.map(t => ({
             user_id: t.user_id,
             account_id: t.account_id,
+            tenant_id: t.tenant_id || null,
             category_id: t.category_id || null,
             transaction_date: t.transaction_date,
             amount: t.amount.toString(),
@@ -843,12 +908,55 @@ async function saveTransactionsToSupabase(transactions) {
 
 const server = http.createServer(async (req, res) => {
   const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] ${req.method} ${req.url}`);
+  // Log apenas método e URL para evitar vazar dados sensíveis em query params (embora não devamos usar query params sensíveis)
+  console.log(`[${timestamp}] ${req.method} ${req.url.split('?')[0]}`);
 
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  // CORS Configuration
+  // Permite configurar origens permitidas via variável de ambiente (separadas por vírgula)
+  // Se não configurado, permite localhost e vercel.app para desenvolvimento, mas bloqueia outros em produção
+  const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
+  const defaultAllowedOrigins = [
+    'http://localhost:3000', 
+    'http://localhost:5173', 
+    'http://localhost:4173',
+    'https://familia-financas.vercel.app',
+    'https://minimax-familia-orcamento.vercel.app' // Adicione outros domínios de produção aqui
+  ];
+  
+  const allowedOrigins = allowedOriginsEnv 
+    ? allowedOriginsEnv.split(',').map(o => o.trim()) 
+    : defaultAllowedOrigins;
+
+  const origin = req.headers.origin;
+  
+  // Lógica de CORS:
+  // 1. Se tiver origin e estiver na lista -> Permite
+  // 2. Se não tiver origin (ex: curl, server-to-server) -> Permite (não é browser)
+  // 3. Se tiver origin e NÃO estiver na lista -> Bloqueia (ou permite * se for ambiente dev explícito)
+  
+  let allowOrigin = '';
+  
+  if (!origin) {
+    allowOrigin = '*'; // Requests sem origin (não-browser)
+  } else if (allowedOrigins.includes(origin)) {
+    allowOrigin = origin;
+  } else {
+    // Em desenvolvimento local, podemos ser mais permissivos se necessário, 
+    // mas por segurança default, vamos logar a tentativa bloqueada
+    console.log(`[CORS] ⚠️ Origem não permitida bloqueada ou tratada como default: ${origin}`);
+    // Se a variável ALLOWED_ORIGINS não estiver definida, permitimos * temporariamente para evitar quebra,
+    // mas idealmente deveria ser restrito.
+    if (!allowedOriginsEnv) {
+       allowOrigin = '*'; 
+    }
+  }
+
+  if (allowOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, apikey, x-client-info');
+    res.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight 24h
+  }
 
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
@@ -856,7 +964,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Health check endpoint
+  // Health check endpoint (Público)
   if (req.url === '/health' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -871,6 +979,23 @@ const server = http.createServer(async (req, res) => {
 
   // Debug endpoint - extrai texto do PDF sem salvar
   if (req.url === '/api/debug-pdf' && req.method === 'POST') {
+    // Verificar Autenticação
+    const authHeader = req.headers['authorization'];
+    const user = await verifyAuthToken(authHeader);
+    
+    if (!user) {
+      console.log(`[AUTH] ❌ Acesso negado a /api/debug-pdf: Token inválido ou ausente`);
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: false,
+        error: 'Acesso não autorizado. Token inválido ou expirado.'
+      }));
+      return;
+    }
+
+    // Restrição adicional: Debug apenas para usuários específicos ou ambiente de dev
+    // (Opcional: verificar role do usuário ou email)
+
     try {
       const contentType = req.headers['content-type'] || '';
       
@@ -946,6 +1071,20 @@ const server = http.createServer(async (req, res) => {
 
   // PDF processing endpoint
   if (req.url === '/api/process-pdf' && req.method === 'POST') {
+    // Verificar Autenticação
+    const authHeader = req.headers['authorization'];
+    const user = await verifyAuthToken(authHeader);
+    
+    if (!user) {
+      console.log(`[AUTH] ❌ Acesso negado a /api/process-pdf: Token inválido ou ausente`);
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: false,
+        error: 'Acesso não autorizado. Por favor, faça login novamente.'
+      }));
+      return;
+    }
+
     try {
       const contentType = req.headers['content-type'] || '';
       
@@ -1006,6 +1145,17 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      // Validação de Segurança: O user_id do form deve bater com o token autenticado
+      if (formData.user_id !== user.id) {
+        console.warn(`[SEC] ⚠️ Tentativa de manipulação de ID: Token(${user.id}) vs Form(${formData.user_id})`);
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: false,
+          error: 'Ação não permitida. Você só pode processar arquivos para sua própria conta.'
+        }));
+        return;
+      }
+
       if (!formData.account_id) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -1019,7 +1169,13 @@ const server = http.createServer(async (req, res) => {
       const accountId = formData.account_id;
       const pdfBuffer = formData.file.data;
 
-      console.log(`[${timestamp}] 📄 Processando PDF (${pdfBuffer.length} bytes) para user ${userId}, account ${accountId}...`);
+      // Buscar tenant_id do usuário para garantir isolamento
+      const tenantId = await getUserTenantId(userId);
+      if (!tenantId) {
+        console.warn(`[SEC] ⚠️ Usuário ${userId} sem tenant_id definido. Usando modo legado (NULL).`);
+      }
+
+      console.log(`[${timestamp}] 📄 Processando PDF (${pdfBuffer.length} bytes) para user ${userId}, account ${accountId}, tenant ${tenantId}...`);
 
       // Processa o PDF
       const pdfData = await pdfParse(pdfBuffer);
@@ -1028,7 +1184,7 @@ const server = http.createServer(async (req, res) => {
       console.log(`[${timestamp}] 📖 PDF parseado: ${pdfData.numpages} páginas, ${text.length} caracteres`);
 
       // Extrai transações
-      const transactions = parseTransactionsFromText(text, userId, accountId);
+      const transactions = parseTransactionsFromText(text, userId, accountId, tenantId);
 
       console.log(`[${timestamp}] 💰 ${transactions.length} transações encontradas`);
 
