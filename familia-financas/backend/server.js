@@ -842,7 +842,7 @@ async function saveTransactionsToSupabase(transactions) {
       
       // Tentar inserir via RPC function (se existir)
       // Converter transações para formato JSONB array
-      const transactionsJsonb = transactions.map(t => ({
+      const transactionsJsonb = transactionsToInsert.map(t => ({
         user_id: t.user_id,
         account_id: t.account_id,
         tenant_id: t.tenant_id || null,
@@ -961,8 +961,15 @@ async function saveTransactionsToSupabase(transactions) {
     }
 
     const insertedCount = data ? data.length : 0;
+    const duplicatesCount = transactions.length - transactionsToInsert.length;
     console.log(`[DB] ✅ ${insertedCount} transações salvas com sucesso!`);
-    return { success: true, inserted: insertedCount };
+    console.log(`[DB] 📊 Resumo: ${transactions.length} encontradas, ${duplicatesCount} duplicadas, ${insertedCount} inseridas`);
+    return { 
+      success: true, 
+      inserted: insertedCount,
+      duplicates: duplicatesCount,
+      totalFound: transactions.length
+    };
   } catch (err) {
     console.error('[DB] ❌ Exceção ao salvar no Supabase:', err.message);
     console.error('[DB] ❌ Stack:', err.stack);
