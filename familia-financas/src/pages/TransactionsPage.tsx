@@ -192,7 +192,10 @@ export default function TransactionsPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      await Promise.all([loadTransactions(), loadAccounts(), loadCategories()]);
+      // Carregar categorias e contas primeiro para garantir que estejam disponíveis
+      await Promise.all([loadAccounts(), loadCategories()]);
+      // Depois carregar transações que dependem das categorias e contas
+      await loadTransactions();
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
     } finally {
@@ -257,11 +260,38 @@ export default function TransactionsPage() {
       console.log('⚠️ Nenhuma transação encontrada para este mês');
     }
 
-    // Criar mapa de contas para busca rápida
-    const accountsMap = new Map(accounts.map(acc => [acc.id, acc]));
+    // Buscar categorias e contas diretamente do estado (já devem estar carregadas)
+    // Se não estiverem, buscar do banco como fallback
+    let categoriesToUse = categories;
+    let accountsToUse = accounts;
     
-    // Criar mapa de categorias para busca rápida (garantir que categorias estejam carregadas)
-    const categoriesMap = new Map((categories || []).map(cat => [cat.id, cat]));
+    if (!categoriesToUse || categoriesToUse.length === 0) {
+      console.log('⚠️ Categorias não carregadas, buscando novamente...');
+      const { data: catsData } = await supabase
+        .from('categories')
+        .select('id, name, color, category_type, icon')
+        .or(`user_id.eq.${user.id},is_system_category.eq.true`)
+        .order('name');
+      categoriesToUse = catsData || [];
+    }
+    
+    if (!accountsToUse || accountsToUse.length === 0) {
+      console.log('⚠️ Contas não carregadas, buscando novamente...');
+      const { data: accsData } = await supabase
+        .from('accounts')
+        .select('id, nickname, institution, current_balance')
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+      accountsToUse = accsData || [];
+    }
+
+    // Criar mapa de contas para busca rápida
+    const accountsMap = new Map(accountsToUse.map(acc => [acc.id, acc]));
+    
+    // Criar mapa de categorias para busca rápida
+    const categoriesMap = new Map((categoriesToUse || []).map(cat => [cat.id, cat]));
+    
+    console.log(`📊 Mapeando transações: ${categoriesToUse.length} categorias, ${accountsToUse.length} contas disponíveis`);
 
     const transactionsData = data?.map((t: any) => {
       const account = t.account_id ? accountsMap.get(t.account_id) : null;
