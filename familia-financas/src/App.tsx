@@ -11,6 +11,7 @@ import OnboardingPage from './pages/OnboardingPage';
 import DashboardPage from './pages/DashboardPage';
 import TransactionsPage from './pages/TransactionsPage';
 import BudgetPage from './pages/BudgetPage';
+import CategoriesPage from './pages/CategoriesPage';
 import IncomeCalendarPage from './pages/IncomeCalendarPage';
 import GoalsPage from './pages/GoalsPage';
 import SettingsPage from './pages/SettingsPage';
@@ -32,8 +33,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  // Redirecionar para onboarding se não completou (exceto se já está no onboarding)
-  if (profile && !profile.onboarding_completed && location.pathname !== '/onboarding') {
+  // Redirecionar para onboarding se não completou (exceto se já está no onboarding ou em páginas essenciais)
+  const allowedPathsWithoutOnboarding = ['/onboarding', '/dashboard', '/categories', '/transactions'];
+  if (profile && !profile.onboarding_completed && !allowedPathsWithoutOnboarding.includes(location.pathname)) {
     console.log('Redirecionando para onboarding - perfil não completo');
     return <Navigate to="/onboarding" replace />;
   }
@@ -90,6 +92,16 @@ function App() {
               <ProtectedRoute>
                 <DashboardLayout>
                   <BudgetPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/categories"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <CategoriesPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
