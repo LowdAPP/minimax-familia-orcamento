@@ -13,7 +13,8 @@ import {
   Menu,
   X,
   TrendingUp,
-  Calendar
+  Calendar,
+  Tag
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -30,8 +31,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/transactions', label: 'Transações', icon: Receipt },
     { path: '/budget', label: 'Orçamento', icon: Wallet },
+    { path: '/categories', label: 'Categorias', icon: Tag },
     { path: '/income-calendar', label: 'Calendário', icon: Calendar },
-    { path: '/goals', label: 'Metas', icon: Target },
+    { path: '/goals', label: 'Metas e Dívidas', icon: Target },
     { path: '/learn', label: 'Aprender', icon: GraduationCap },
     { path: '/settings', label: 'Configurações', icon: Settings },
   ];
