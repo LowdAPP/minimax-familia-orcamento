@@ -1076,6 +1076,105 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // Auto-categorize endpoint (retroactive)
+  if (req.url === '/api/auto-categorize' && req.method === 'POST') {
+    try {
+      // Ler body JSON
+      const body = await new Promise((resolve, reject) => {
+        let data = '';
+        req.on('data', chunk => data += chunk);
+        req.on('end', () => resolve(data));
+        req.on('error', reject);
+      });
+
+      const { userId } = JSON.parse(body);
+
+      if (!userId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'userId obrigatório' }));
+        return;
+      }
+
+      console.log(`[${timestamp}] 🤖 Iniciando auto-categorização retroativa para user ${userId}...`);
+
+      const categorizer = new AutoCategorizer(supabase);
+      await categorizer.train(userId);
+
+      // Buscar transações sem categoria
+      const { data: transactions, error: txError } = await supabase
+        .from('transactions')
+        .select('id, description, category_id')
+        .eq('user_id', userId)
+        .is('category_id', null);
+
+      if (txError) throw txError;
+
+      if (!transactions || transactions.length === 0) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+          success: true, 
+          message: 'Nenhuma transação sem categoria encontrada.',
+          count: 0 
+        }));
+        return;
+      }
+
+      console.log(`[${timestamp}] 🔍 Analisando ${transactions.length} transações sem categoria...`);
+
+      const updates = [];
+      let updateCount = 0;
+
+      for (const tx of transactions) {
+        const prediction = categorizer.predict(tx.description);
+        if (prediction) {
+          updates.push({
+            id: tx.id,
+            category_id: prediction.id
+          });
+          updateCount++;
+        }
+      }
+
+      // Atualizar em lotes de 50
+      const batchSize = 50;
+      let successCount = 0;
+
+      for (let i = 0; i < updates.length; i += batchSize) {
+        const batch = updates.slice(i, i + batchSize);
+        
+        // Como supabase.update não aceita array para update em massa com IDs diferentes de forma simples,
+        // vamos fazer um loop de promises paralelo para o lote (upsert seria ideal mas requer mudar a query)
+        // Ou melhor: usar um loop simples por enquanto para garantir consistência
+        
+        await Promise.all(batch.map(async (update) => {
+            const { error } = await supabase
+                .from('transactions')
+                .update({ category_id: update.category_id })
+                .eq('id', update.id);
+            
+            if (!error) successCount++;
+        }));
+      }
+
+      console.log(`[${timestamp}] ✅ Auto-categorização concluída. ${successCount} transações atualizadas.`);
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        message: `${successCount} transações foram categorizadas automaticamente.`,
+        count: successCount,
+        totalAnalyzed: transactions.length
+      }));
+      return;
+
+    } catch (error) {
+      console.error(`[${timestamp}] ❌ Erro na auto-categorização:`, error);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: error.message }));
+      return;
+    }
+  }
+
   // 404 para rotas desconhecidas
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({
