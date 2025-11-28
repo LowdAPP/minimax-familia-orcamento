@@ -1366,6 +1366,11 @@ export default function TransactionsPage() {
                     <p className="text-small sm:text-body font-semibold text-neutral-900 truncate">
                       {transaction.description}
                     </p>
+                    {transaction.category_name && (
+                      <p className="text-[10px] sm:text-xs text-neutral-500 mt-0.5">
+                        {transaction.category_name}
+                      </p>
+                    )}
                     <div className="flex items-center gap-xs mt-xs flex-wrap">
                       <span className="text-xs sm:text-small text-neutral-500">
                         {formatDate(transaction.transaction_date)}
