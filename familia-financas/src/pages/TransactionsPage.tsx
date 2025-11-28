@@ -364,10 +364,19 @@ export default function TransactionsPage() {
       
       console.log('🔗 URL do backend para auto-categorização:', backendUrl);
       
+      // Obter token de autenticação
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
+      }
+      
       const response = await fetch(`${backendUrl}/api/auto-categorize`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ userId: user.id }),
       });
@@ -472,7 +481,8 @@ export default function TransactionsPage() {
       setUploadProgress('Enviando PDF para processamento...');
 
       // URL do backend (Railway ou local)
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+      // Em produção (Vercel/Railway), usar a URL do backend configurada ou a URL do Railway conhecida
+      const backendUrl = import.meta.env.VITE_API_URL || 'https://minimax-familia-orcamento-production.up.railway.app';
 
       // 1. Enviar PDF para o backend
       const formData = new FormData();
@@ -482,8 +492,19 @@ export default function TransactionsPage() {
 
       console.log('📤 Enviando PDF para backend:', backendUrl);
 
+      // Obter token de autenticação
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
+      }
+
       const response = await fetch(`${backendUrl}/api/process-pdf`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData
       });
 
