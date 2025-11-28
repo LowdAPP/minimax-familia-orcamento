@@ -1,4 +1,4 @@
-// Página de Transações - Gestão e Upload de PDFs
+// Página de Transações - Gestão e Upload de Arquivos (PDF, CSV, Excel)
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useI18n } from '../hooks/useI18n';
@@ -358,7 +358,7 @@ export default function TransactionsPage() {
     
     setAutoCategorizing(true);
     try {
-      // Usar a mesma lógica de URL do upload de PDF
+      // Usar a mesma lógica de URL do upload de arquivos
       const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       
       console.log('🔗 URL do backend para auto-categorização:', backendUrl);
@@ -453,13 +453,16 @@ export default function TransactionsPage() {
         isOpen: true,
         type: 'error',
         title: 'Conta Não Selecionada',
-        message: 'Por favor, selecione uma conta para associar as transações do PDF.'
+        message: 'Por favor, selecione uma conta para associar as transações do arquivo.'
       });
       return;
     }
 
     setUploading(true);
     setUploadProgress('Fazendo upload do arquivo...');
+
+    // Determinar tipo de arquivo (disponível em todo o escopo da função)
+    const fileType = isPDF ? 'PDF' : isCSV ? 'CSV' : 'Excel';
 
     try {
       // Usar conta selecionada ou criar uma padrão se não houver contas
@@ -489,18 +492,18 @@ export default function TransactionsPage() {
         setSelectedAccountForUpload(newAccount.id);
       }
 
-      setUploadProgress('Enviando PDF para processamento...');
+      setUploadProgress(`Enviando ${fileType} para processamento...`);
 
       // URL do backend (Railway ou local)
       const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-      // 1. Enviar PDF para o backend
+      // 1. Enviar arquivo para o backend
       const formData = new FormData();
       formData.append('file', file);
       formData.append('user_id', user.id);
       formData.append('account_id', accountId);
 
-      console.log('📤 Enviando PDF para backend:', backendUrl);
+      console.log(`📤 Enviando ${fileType} para backend:`, backendUrl);
 
       // Obter token de autenticação
       const { data: { session } } = await supabase.auth.getSession();
@@ -530,8 +533,8 @@ export default function TransactionsPage() {
         setResultModal({
           isOpen: true,
           type: 'error',
-          title: 'Erro ao Processar PDF',
-          message: result.error || 'Erro ao processar PDF',
+          title: `Erro ao Processar ${fileType}`,
+          message: result.error || `Erro ao processar ${fileType}`,
           details: 'Tente novamente ou verifique se o arquivo está correto.'
         });
         setUploadProgress('');
@@ -560,12 +563,16 @@ export default function TransactionsPage() {
       }
 
       if (transactionCount === 0 && transactionsFound === 0) {
+        const details = isPDF 
+          ? '💡 Verifique se o arquivo contém transações visíveis (não imagens escaneadas).'
+          : '💡 Verifique se o arquivo contém colunas de data, descrição e valor.';
+        
         setResultModal({
           isOpen: true,
           type: 'warning',
           title: 'Nenhuma Transação Encontrada',
-          message: 'Nenhuma transação foi encontrada no PDF.',
-          details: '💡 Verifique se o arquivo contém transações visíveis (não imagens escaneadas).',
+          message: `Nenhuma transação foi encontrada no ${fileType}.`,
+          details: details,
           transactionsFound: 0,
           transactionCount: 0
         });
@@ -578,7 +585,7 @@ export default function TransactionsPage() {
       setResultModal({
         isOpen: true,
         type: 'success',
-        title: 'PDF Processado com Sucesso!',
+        title: `${fileType} Processado com Sucesso!`,
         message: `${transactionCount} transação${transactionCount !== 1 ? 'ões' : ''} importada${transactionCount !== 1 ? 's' : ''} com sucesso!`,
         details: 'As transações foram adicionadas à sua conta.',
         transactionCount,
@@ -614,9 +621,9 @@ export default function TransactionsPage() {
       await loadTransactions();
 
     } catch (error: any) {
-      console.error('❌ Erro completo ao processar PDF:', error);
+      console.error('❌ Erro completo ao processar arquivo:', error);
       
-      let errorMessage = 'Erro ao processar PDF';
+      let errorMessage = 'Erro ao processar arquivo';
       if (error.message) {
         errorMessage = error.message;
       } else if (error.toString) {
@@ -644,7 +651,7 @@ export default function TransactionsPage() {
       setResultModal({
         isOpen: true,
         type: 'error',
-        title: 'Erro ao Processar PDF',
+        title: `Erro ao Processar ${fileType}`,
         message: friendlyMessage,
         details: details || 'Tente novamente ou entre em contato com o suporte.'
       });
@@ -1192,7 +1199,7 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* Upload PDF */}
+      {/* Upload de Arquivos */}
       <Card>
         <div className="flex flex-col gap-md">
           <div className="flex-1">
@@ -1200,7 +1207,7 @@ export default function TransactionsPage() {
               Importar Extrato Bancário
             </h3>
             <p className="text-small text-neutral-600">
-              Faça upload do PDF do seu banco para importação automática de transações
+              Faça upload do arquivo do seu banco (PDF, CSV ou Excel) para importação automática de transações
             </p>
           </div>
           
@@ -1236,11 +1243,11 @@ export default function TransactionsPage() {
           )}
 
           <div className="w-full sm:w-auto">
-            <label htmlFor="pdf-upload" className="block w-full sm:w-auto">
+            <label htmlFor="file-upload" className="block w-full sm:w-auto">
               <input
-                id="pdf-upload"
+                id="file-upload"
                 type="file"
-                accept="application/pdf"
+                accept=".pdf,.csv,.xls,.xlsx,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 onChange={handleFileUpload}
                 disabled={uploading || (accounts.length > 0 && !selectedAccountForUpload)}
                 className="hidden"
@@ -1254,7 +1261,7 @@ export default function TransactionsPage() {
                 className="sm:w-auto"
               >
                 <Upload className="w-4 h-4" />
-                {uploading ? 'Processando...' : 'Selecionar PDF'}
+                {uploading ? 'Processando...' : 'Enviar Arquivo'}
               </Button>
             </label>
           </div>

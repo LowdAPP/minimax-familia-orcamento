@@ -389,6 +389,337 @@ function extractMerchant(description) {
   return cleaned.substring(0, 200);
 }
 
+// Função para processar CSV e extrair transações
+function parseTransactionsFromCSV(csvBuffer, userId, accountId, tenantId) {
+  const transactions = [];
+  
+  try {
+    console.log(`[CSV] 📄 Processando CSV (${csvBuffer.length} bytes)...`);
+    
+    // Converte buffer para string
+    const csvText = csvBuffer.toString('utf-8');
+    
+    // Parse do CSV usando csv-parse
+    const records = parse(csvText, {
+      columns: true, // Primeira linha como cabeçalho
+      skip_empty_lines: true,
+      trim: true,
+      relax_column_count: true // Permite linhas com número diferente de colunas
+    });
+    
+    console.log(`[CSV] 📊 ${records.length} linhas encontradas no CSV`);
+    
+    // Tenta detectar colunas automaticamente (formatos comuns)
+    let dateColumn = null;
+    let descriptionColumn = null;
+    let amountColumn = null;
+    let typeColumn = null;
+    
+    if (records.length > 0) {
+      const headers = Object.keys(records[0]);
+      console.log(`[CSV] 📋 Colunas detectadas: ${headers.join(', ')}`);
+      
+      // Busca colunas por nomes comuns (case-insensitive)
+      headers.forEach(header => {
+        const lowerHeader = header.toLowerCase();
+        if (!dateColumn && (lowerHeader.includes('data') || lowerHeader.includes('date'))) {
+          dateColumn = header;
+        }
+        if (!descriptionColumn && (lowerHeader.includes('descrição') || lowerHeader.includes('descricao') || 
+            lowerHeader.includes('description') || lowerHeader.includes('desc') || 
+            lowerHeader.includes('histórico') || lowerHeader.includes('historico'))) {
+          descriptionColumn = header;
+        }
+        if (!amountColumn && (lowerHeader.includes('valor') || lowerHeader.includes('amount') || 
+            lowerHeader.includes('montante') || lowerHeader.includes('total'))) {
+          amountColumn = header;
+        }
+        if (!typeColumn && (lowerHeader.includes('tipo') || lowerHeader.includes('type') || 
+            lowerHeader.includes('débito') || lowerHeader.includes('debito') || 
+            lowerHeader.includes('crédito') || lowerHeader.includes('credito'))) {
+          typeColumn = header;
+        }
+      });
+      
+      // Se não encontrou, tenta usar as primeiras colunas como padrão
+      if (!dateColumn && headers.length >= 1) dateColumn = headers[0];
+      if (!descriptionColumn && headers.length >= 2) descriptionColumn = headers[1];
+      if (!amountColumn && headers.length >= 3) amountColumn = headers[2];
+    }
+    
+    console.log(`[CSV] 🔍 Colunas mapeadas: Data=${dateColumn}, Descrição=${descriptionColumn}, Valor=${amountColumn}, Tipo=${typeColumn || 'auto'}`);
+    
+    // Processa cada linha
+    for (const record of records) {
+      try {
+        // Extrai dados
+        const dateStr = record[dateColumn] || '';
+        const description = (record[descriptionColumn] || '').trim();
+        const amountStr = record[amountColumn] || '';
+        const typeStr = (record[typeColumn] || '').toLowerCase().trim();
+        
+        // Valida campos obrigatórios
+        if (!dateStr || !description || !amountStr) {
+          continue;
+        }
+        
+        // Parse da data
+        const transactionDate = parseDate(dateStr);
+        if (!transactionDate) {
+          console.log(`[CSV] ⚠️ Data inválida na linha: ${dateStr}`);
+          continue;
+        }
+        
+        // Parse do valor
+        const amountValue = parseAmount(amountStr);
+        if (!amountValue || amountValue < 0.01) {
+          console.log(`[CSV] ⚠️ Valor inválido na linha: ${amountStr}`);
+          continue;
+        }
+        
+        // Determina tipo de transação
+        let amount = amountValue;
+        let transactionType = 'despesa';
+        
+        if (typeStr) {
+          if (typeStr.includes('crédito') || typeStr.includes('credito') || 
+              typeStr.includes('receita') || typeStr.includes('entrada') || 
+              typeStr.includes('credit') || typeStr.includes('income')) {
+            transactionType = 'receita';
+            amount = amountValue;
+          } else if (typeStr.includes('débito') || typeStr.includes('debito') || 
+                     typeStr.includes('despesa') || typeStr.includes('saída') || 
+                     typeStr.includes('saida') || typeStr.includes('debit') || 
+                     typeStr.includes('expense')) {
+            transactionType = 'despesa';
+            amount = -amountValue;
+          }
+        } else {
+          // Se não tem tipo, verifica se o valor é negativo ou positivo
+          // Se o valor original já tinha sinal, usa ele
+          if (amountStr.trim().startsWith('-')) {
+            amount = -amountValue;
+            transactionType = 'despesa';
+          } else if (amountStr.trim().startsWith('+')) {
+            amount = amountValue;
+            transactionType = 'receita';
+          } else {
+            // Por padrão, assume despesa (valor negativo)
+            amount = -amountValue;
+            transactionType = 'despesa';
+          }
+        }
+        
+        // Valida descrição
+        if (description.length < 3 || description.length > 500) {
+          continue;
+        }
+        
+        // Verifica duplicatas
+        const isDuplicate = transactions.some(t =>
+          t.transaction_date === transactionDate &&
+          Math.abs(t.amount - amount) < 0.01 &&
+          t.description === description
+        );
+        
+        if (!isDuplicate) {
+          console.log(`[CSV] ✅ Transação: ${transactionDate} | ${description.substring(0, 40)} | ${amount}`);
+          transactions.push({
+            user_id: userId,
+            account_id: accountId,
+            tenant_id: tenantId,
+            transaction_date: transactionDate,
+            amount: amount,
+            description: description,
+            merchant: extractMerchant(description),
+            transaction_type: transactionType,
+            status: 'confirmed',
+            source: 'pdf_import' // Mantém compatibilidade com o frontend
+          });
+        }
+      } catch (rowError) {
+        console.log(`[CSV] ⚠️ Erro ao processar linha: ${rowError.message}`);
+        continue;
+      }
+    }
+    
+    console.log(`[CSV] ✅ Total de ${transactions.length} transações parseadas do CSV`);
+    return transactions;
+  } catch (error) {
+    console.error(`[CSV] ❌ Erro ao processar CSV:`, error.message);
+    throw error;
+  }
+}
+
+// Função para processar Excel (XLS/XLSX) e extrair transações
+function parseTransactionsFromExcel(excelBuffer, userId, accountId, tenantId) {
+  const transactions = [];
+  
+  try {
+    console.log(`[EXCEL] 📄 Processando Excel (${excelBuffer.length} bytes)...`);
+    
+    // Lê o arquivo Excel
+    const workbook = xlsx.read(excelBuffer, { type: 'buffer' });
+    
+    // Pega a primeira planilha
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    
+    // Converte para JSON
+    const records = xlsx.utils.sheet_to_json(worksheet, {
+      defval: '', // Valor padrão para células vazias
+      raw: false // Converte valores para string
+    });
+    
+    console.log(`[EXCEL] 📊 ${records.length} linhas encontradas na planilha "${sheetName}"`);
+    
+    if (records.length === 0) {
+      console.log(`[EXCEL] ⚠️ Planilha vazia`);
+      return transactions;
+    }
+    
+    // Detecta colunas (mesma lógica do CSV)
+    let dateColumn = null;
+    let descriptionColumn = null;
+    let amountColumn = null;
+    let typeColumn = null;
+    
+    const headers = Object.keys(records[0]);
+    console.log(`[EXCEL] 📋 Colunas detectadas: ${headers.join(', ')}`);
+    
+    headers.forEach(header => {
+      const lowerHeader = header.toLowerCase();
+      if (!dateColumn && (lowerHeader.includes('data') || lowerHeader.includes('date'))) {
+        dateColumn = header;
+      }
+      if (!descriptionColumn && (lowerHeader.includes('descrição') || lowerHeader.includes('descricao') || 
+          lowerHeader.includes('description') || lowerHeader.includes('desc') || 
+          lowerHeader.includes('histórico') || lowerHeader.includes('historico'))) {
+        descriptionColumn = header;
+      }
+      if (!amountColumn && (lowerHeader.includes('valor') || lowerHeader.includes('amount') || 
+          lowerHeader.includes('montante') || lowerHeader.includes('total'))) {
+        amountColumn = header;
+      }
+      if (!typeColumn && (lowerHeader.includes('tipo') || lowerHeader.includes('type') || 
+          lowerHeader.includes('débito') || lowerHeader.includes('debito') || 
+          lowerHeader.includes('crédito') || lowerHeader.includes('credito'))) {
+        typeColumn = header;
+      }
+    });
+    
+    // Fallback para primeiras colunas
+    if (!dateColumn && headers.length >= 1) dateColumn = headers[0];
+    if (!descriptionColumn && headers.length >= 2) descriptionColumn = headers[1];
+    if (!amountColumn && headers.length >= 3) amountColumn = headers[2];
+    
+    console.log(`[EXCEL] 🔍 Colunas mapeadas: Data=${dateColumn}, Descrição=${descriptionColumn}, Valor=${amountColumn}, Tipo=${typeColumn || 'auto'}`);
+    
+    // Processa cada linha (mesma lógica do CSV)
+    for (const record of records) {
+      try {
+        const dateStr = String(record[dateColumn] || '').trim();
+        const description = String(record[descriptionColumn] || '').trim();
+        const amountStr = String(record[amountColumn] || '').trim();
+        const typeStr = String(record[typeColumn] || '').toLowerCase().trim();
+        
+        if (!dateStr || !description || !amountStr) {
+          continue;
+        }
+        
+        // Parse da data (Excel pode retornar números de data serial ou strings formatadas)
+        let transactionDate = parseDate(dateStr);
+        
+        // Se não conseguiu parsear como string, tenta como número serial do Excel
+        // Excel usa 1 de janeiro de 1900 como base (mas tem bug do ano 1900, então ajustamos)
+        if (!transactionDate && !isNaN(dateStr) && parseFloat(dateStr) > 0) {
+          const excelSerial = parseFloat(dateStr);
+          // Excel serial date: 1 = 1900-01-01, mas Excel trata 1900 como bissexto (bug)
+          // Ajuste: subtrai 2 dias para compensar o bug do Excel
+          const baseDate = new Date(1899, 11, 30); // 30 de dezembro de 1899
+          const jsDate = new Date(baseDate.getTime() + excelSerial * 86400000);
+          
+          if (!isNaN(jsDate.getTime())) {
+            const year = jsDate.getFullYear();
+            const month = String(jsDate.getMonth() + 1).padStart(2, '0');
+            const day = String(jsDate.getDate()).padStart(2, '0');
+            transactionDate = `${year}-${month}-${day}`;
+          }
+        }
+        
+        if (!transactionDate) {
+          console.log(`[EXCEL] ⚠️ Data inválida na linha: ${dateStr}`);
+          continue;
+        }
+        
+        const amountValue = parseAmount(amountStr);
+        if (!amountValue || amountValue < 0.01) {
+          console.log(`[EXCEL] ⚠️ Valor inválido na linha: ${amountStr}`);
+          continue;
+        }
+        
+        let amount = amountValue;
+        let transactionType = 'despesa';
+        
+        if (typeStr) {
+          if (typeStr.includes('crédito') || typeStr.includes('credito') || 
+              typeStr.includes('receita') || typeStr.includes('entrada') || 
+              typeStr.includes('credit') || typeStr.includes('income')) {
+            transactionType = 'receita';
+            amount = amountValue;
+          } else {
+            transactionType = 'despesa';
+            amount = -amountValue;
+          }
+        } else {
+          if (amountStr.trim().startsWith('-') || amountValue < 0) {
+            amount = -Math.abs(amountValue);
+            transactionType = 'despesa';
+          } else {
+            amount = Math.abs(amountValue);
+            transactionType = 'receita';
+          }
+        }
+        
+        if (description.length < 3 || description.length > 500) {
+          continue;
+        }
+        
+        const isDuplicate = transactions.some(t =>
+          t.transaction_date === transactionDate &&
+          Math.abs(t.amount - amount) < 0.01 &&
+          t.description === description
+        );
+        
+        if (!isDuplicate) {
+          console.log(`[EXCEL] ✅ Transação: ${transactionDate} | ${description.substring(0, 40)} | ${amount}`);
+          transactions.push({
+            user_id: userId,
+            account_id: accountId,
+            tenant_id: tenantId,
+            transaction_date: transactionDate,
+            amount: amount,
+            description: description,
+            merchant: extractMerchant(description),
+            transaction_type: transactionType,
+            status: 'confirmed',
+            source: 'pdf_import' // Mantém compatibilidade
+          });
+        }
+      } catch (rowError) {
+        console.log(`[EXCEL] ⚠️ Erro ao processar linha: ${rowError.message}`);
+        continue;
+      }
+    }
+    
+    console.log(`[EXCEL] ✅ Total de ${transactions.length} transações parseadas do Excel`);
+    return transactions;
+  } catch (error) {
+    console.error(`[EXCEL] ❌ Erro ao processar Excel:`, error.message);
+    throw error;
+  }
+}
+
 // Função para extrair transações do texto do PDF
 function parseTransactionsFromText(text, userId, accountId, tenantId) {
   const transactions = [];
@@ -1234,7 +1565,7 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // PDF processing endpoint
+  // File processing endpoint (PDF, CSV, XLS/XLSX)
   if (req.url === '/api/process-pdf' && req.method === 'POST') {
     // Verificar Autenticação
     const authHeader = req.headers['authorization'];
@@ -1296,7 +1627,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           success: false,
-          error: 'Arquivo PDF não encontrado no FormData'
+          error: 'Arquivo não encontrado no FormData'
         }));
         return;
       }
@@ -1332,7 +1663,8 @@ const server = http.createServer(async (req, res) => {
 
       const userId = formData.user_id;
       const accountId = formData.account_id;
-      const pdfBuffer = formData.file.data;
+      const fileBuffer = formData.file.data;
+      const fileName = formData.file.filename || 'arquivo';
 
       // Buscar tenant_id do usuário para garantir isolamento
       const tenantId = await getUserTenantId(userId);
@@ -1340,16 +1672,42 @@ const server = http.createServer(async (req, res) => {
         console.warn(`[SEC] ⚠️ Usuário ${userId} sem tenant_id definido. Usando modo legado (NULL).`);
       }
 
-      console.log(`[${timestamp}] 📄 Processando PDF (${pdfBuffer.length} bytes) para user ${userId}, account ${accountId}, tenant ${tenantId}...`);
+      // Detecta o tipo de arquivo pela extensão
+      const fileExtension = fileName.toLowerCase().split('.').pop();
+      const isPDF = fileExtension === 'pdf' || fileName.toLowerCase().endsWith('.pdf');
+      const isCSV = fileExtension === 'csv' || fileName.toLowerCase().endsWith('.csv');
+      const isXLS = fileExtension === 'xls' || fileExtension === 'xlsx' || 
+                    fileName.toLowerCase().endsWith('.xls') || fileName.toLowerCase().endsWith('.xlsx');
 
-      // Processa o PDF
-      const pdfData = await pdfParse(pdfBuffer);
-      const text = pdfData.text;
+      console.log(`[${timestamp}] 📄 Processando arquivo: ${fileName} (${fileBuffer.length} bytes, tipo: ${fileExtension}) para user ${userId}, account ${accountId}, tenant ${tenantId}...`);
 
-      console.log(`[${timestamp}] 📖 PDF parseado: ${pdfData.numpages} páginas, ${text.length} caracteres`);
+      let transactions = [];
+      let fileInfo = {};
 
-      // Extrai transações
-      const transactions = parseTransactionsFromText(text, userId, accountId, tenantId);
+      // Processa conforme o tipo de arquivo
+      if (isPDF) {
+        console.log(`[${timestamp}] 📄 Processando como PDF...`);
+        const pdfData = await pdfParse(fileBuffer);
+        const text = pdfData.text;
+        console.log(`[${timestamp}] 📖 PDF parseado: ${pdfData.numpages} páginas, ${text.length} caracteres`);
+        transactions = parseTransactionsFromText(text, userId, accountId, tenantId);
+        fileInfo = { pdfPages: pdfData.numpages, fileType: 'pdf' };
+      } else if (isCSV) {
+        console.log(`[${timestamp}] 📊 Processando como CSV...`);
+        transactions = parseTransactionsFromCSV(fileBuffer, userId, accountId, tenantId);
+        fileInfo = { fileType: 'csv' };
+      } else if (isXLS) {
+        console.log(`[${timestamp}] 📊 Processando como Excel...`);
+        transactions = parseTransactionsFromExcel(fileBuffer, userId, accountId, tenantId);
+        fileInfo = { fileType: 'excel' };
+      } else {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: false,
+          error: `Tipo de arquivo não suportado: ${fileExtension}. Formatos aceitos: PDF, CSV, XLS, XLSX`
+        }));
+        return;
+      }
 
       console.log(`[${timestamp}] 💰 ${transactions.length} transações encontradas`);
 
@@ -1361,11 +1719,12 @@ const server = http.createServer(async (req, res) => {
       // Se houve erro ao salvar, ainda retorna sucesso mas com informação do erro
       const response = {
         success: true,
-        message: 'PDF processado com sucesso',
+        message: `${fileInfo.fileType === 'pdf' ? 'PDF' : fileInfo.fileType === 'csv' ? 'CSV' : 'Excel'} processado com sucesso`,
         transactionsFound: transactions.length,
         transactionsInserted: dbResult.inserted || 0,
         transactions: transactions.slice(0, 10), // Primeiras 10 para o frontend detectar o mês
-        pdfPages: pdfData.numpages,
+        fileType: fileInfo.fileType,
+        ...fileInfo,
         databaseSave: dbResult,
         timestamp: timestamp
       };
@@ -1384,7 +1743,7 @@ const server = http.createServer(async (req, res) => {
       return;
 
     } catch (error) {
-      console.error(`[${timestamp}] ❌ Erro ao processar PDF:`, error.message);
+      console.error(`[${timestamp}] ❌ Erro ao processar arquivo:`, error.message);
       console.error(error.stack);
 
       res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -1509,7 +1868,7 @@ server.listen(PORT, '0.0.0.0', () => {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] ✅ Servidor rodando na porta ${PORT}`);
   console.log(`[${timestamp}] 🏥 Health check: GET /health`);
-  console.log(`[${timestamp}] 📄 API: POST /api/process-pdf`);
+  console.log(`[${timestamp}] 📄 API: POST /api/process-pdf (suporta PDF, CSV, XLS, XLSX)`);
   console.log(`[${timestamp}] 🚀 Pronto para receber requisições!`);
   console.log(`[${timestamp}] 📍 PORT: ${process.env.PORT || 'não definido (usando 3000)'}`);
   console.log(`[${timestamp}] 🔧 Supabase: ${supabase ? '✅ Configurado' : '❌ Não configurado'}`);
