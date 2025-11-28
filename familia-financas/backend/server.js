@@ -181,6 +181,136 @@ function parseAmount(amountStr) {
   return isNaN(value) ? null : Math.abs(value);
 }
 
+// Classe para Auto-Categorização baseada em histórico
+class AutoCategorizer {
+  constructor(supabaseClient) {
+    this.supabase = supabaseClient;
+    this.exactMatches = new Map(); // descrição exata -> category_id
+    this.keywordMatches = new Map(); // palavra-chave -> { category_id, count }
+    this.categories = new Map(); // id -> { name, color, icon }
+  }
+
+  async train(userId) {
+    console.log(`[AutoCategorizer] 🧠 Treinando modelo para usuário ${userId}...`);
+    
+    try {
+      // 1. Carregar todas as categorias do usuário
+      const { data: categories, error: catError } = await this.supabase
+        .from('categories')
+        .select('id, name, color, icon')
+        .or(`user_id.eq.${userId},is_system_category.eq.true`);
+
+      if (catError) throw catError;
+
+      categories.forEach(cat => {
+        this.categories.set(cat.id, cat);
+      });
+
+      // 2. Carregar histórico de transações categorizadas
+      // Limitamos a 1000 para performance, focando nas mais recentes
+      const { data: transactions, error: txError } = await this.supabase
+        .from('transactions')
+        .select('description, category_id')
+        .eq('user_id', userId)
+        .not('category_id', 'is', null)
+        .order('transaction_date', { ascending: false })
+        .limit(2000);
+
+      if (txError) throw txError;
+
+      if (!transactions || transactions.length === 0) {
+        console.log('[AutoCategorizer] ⚠️ Nenhum histórico encontrado para treinamento.');
+        return;
+      }
+
+      // 3. Construir modelos
+      transactions.forEach(tx => {
+        if (!tx.description || !tx.category_id) return;
+
+        const desc = tx.description.toLowerCase().trim();
+        
+        // Modelo de Match Exato
+        // Se já existe, mantém (prioridade para mais recentes pois ordenamos desc)
+        if (!this.exactMatches.has(desc)) {
+          this.exactMatches.set(desc, tx.category_id);
+        }
+
+        // Modelo de Palavras-Chave (Simplificado)
+        // Tokeniza a descrição e conta frequência de categoria por palavra relevante
+        const tokens = desc.split(/[\s\-\.,]+/);
+        tokens.forEach(token => {
+          if (token.length < 3) return; // Ignora palavras curtas
+          if (/^\d+$/.test(token)) return; // Ignora números puros
+
+          if (!this.keywordMatches.has(token)) {
+            this.keywordMatches.set(token, {});
+          }
+          
+          const tokenStats = this.keywordMatches.get(token);
+          tokenStats[tx.category_id] = (tokenStats[tx.category_id] || 0) + 1;
+        });
+      });
+
+      console.log(`[AutoCategorizer] ✅ Modelo treinado com ${transactions.length} transações.`);
+      console.log(`[AutoCategorizer] 📊 Patterns exatos: ${this.exactMatches.size}, Keywords: ${this.keywordMatches.size}`);
+
+    } catch (error) {
+      console.error('[AutoCategorizer] ❌ Erro no treinamento:', error);
+    }
+  }
+
+  predict(description) {
+    if (!description) return null;
+
+    const desc = description.toLowerCase().trim();
+
+    // 1. Tentar Match Exato
+    if (this.exactMatches.has(desc)) {
+      const catId = this.exactMatches.get(desc);
+      const cat = this.categories.get(catId);
+      if (cat) {
+        return { ...cat, confidence: 'exact', match_type: 'Histórico Exato' };
+      }
+    }
+
+    // 2. Tentar Match por Palavras-Chave (Frequência)
+    const tokens = desc.split(/[\s\-\.,]+/);
+    const scores = {};
+
+    tokens.forEach(token => {
+      if (token.length < 3 || /^\d+$/.test(token)) return;
+
+      const matches = this.keywordMatches.get(token);
+      if (matches) {
+        Object.entries(matches).forEach(([catId, count]) => {
+          scores[catId] = (scores[catId] || 0) + count;
+        });
+      }
+    });
+
+    // Encontrar categoria com maior pontuação
+    let bestCatId = null;
+    let maxScore = 0;
+
+    Object.entries(scores).forEach(([catId, score]) => {
+      if (score > maxScore) {
+        maxScore = score;
+        bestCatId = catId;
+      }
+    });
+
+    // Definir um limiar mínimo de confiança (heurístico)
+    if (bestCatId && maxScore >= 2) {
+      const cat = this.categories.get(bestCatId);
+      if (cat) {
+        return { ...cat, confidence: 'keyword', match_type: 'Palavras-chave' };
+      }
+    }
+
+    return null;
+  }
+}
+
 // Função para extrair merchant da descrição
 function extractMerchant(description) {
   if (!description) return null;
