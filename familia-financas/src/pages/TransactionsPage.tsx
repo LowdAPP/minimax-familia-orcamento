@@ -1350,8 +1350,15 @@ export default function TransactionsPage() {
                   >
                     {transaction.category_icon ? (
                       renderCategoryIcon(transaction.category_icon, 'w-4 h-4 sm:w-5 sm:h-5')
-                    ) : (
+                    ) : transaction.category_name ? (
                       <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
+                    ) : (
+                      <span 
+                        className="text-[8px] sm:text-[10px] font-semibold leading-tight text-center"
+                        style={{ transform: 'rotate(-30deg)' }}
+                      >
+                        Sem Categoria
+                      </span>
                     )}
                   </div>
 
