@@ -2,6 +2,8 @@
 
 const http = require('http');
 const pdfParse = require('pdf-parse');
+const { parse } = require('csv-parse/sync');
+const xlsx = require('xlsx');
 const { createClient } = require('@supabase/supabase-js');
 const PORT = process.env.PORT || 3000;
 
