@@ -100,47 +100,89 @@ export default function DashboardPage() {
 
     const currentMonth = new Date().toISOString().slice(0, 7);
     const [year, month] = currentMonth.split('-');
+    // Calcular último dia do mês atual corretamente
+    // currentMonth vem como "2024-11" (novembro), onde month é "11" (1-12)
+    // Em JS, meses são 0-11 (0=janeiro, 11=dezembro)
+    // new Date(year, month, 0) retorna o último dia do mês anterior ao especificado
+    // Se month é "11" (novembro em formato 1-12), parseInt(month) = 11 (dezembro em JS)
+    // new Date(2024, 11, 0) = último dia de novembro ✓
     const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
     const endDate = `${currentMonth}-${String(lastDay).padStart(2, '0')}`;
 
-    // Carregar contas
+    console.log('📅 Período calculado:', {
+      currentMonth,
+      startDate: `${currentMonth}-01`,
+      endDate,
+      lastDay
+    });
+
+    // Carregar contas ativas
     const { data: accounts, error: accountsError } = await supabase
       .from('accounts')
-      .select('current_balance')
+      .select('id, current_balance, account_type, nickname')
       .eq('user_id', user.id)
       .eq('is_active', true);
 
     if (accountsError) {
-      console.error('Erro ao carregar contas:', accountsError);
+      console.error('❌ Erro ao carregar contas:', accountsError);
+    } else {
+      console.log('💳 Contas carregadas:', accounts?.length || 0, accounts);
     }
 
-    const totalBalance = accounts?.reduce((sum, acc) => sum + (acc.current_balance || 0), 0) || 0;
+    const totalBalance = accounts?.reduce((sum, acc) => {
+      const balance = parseFloat(acc.current_balance) || 0;
+      return sum + balance;
+    }, 0) || 0;
 
-    // Carregar transações do mês
+    // Carregar TODAS as transações do mês (independente do status)
+    // Conforme documentação: transações pendentes também devem ser consideradas
     const { data: transactions, error: transactionsError } = await supabase
       .from('transactions')
-      .select('amount, transaction_type')
+      .select('id, amount, transaction_type, status, transaction_date, description')
       .eq('user_id', user.id)
       .gte('transaction_date', `${currentMonth}-01`)
-      .lte('transaction_date', endDate);
+      .lte('transaction_date', endDate)
+      .neq('status', 'cancelled'); // Excluir apenas canceladas
 
     if (transactionsError) {
-      console.error('Erro ao carregar transações:', transactionsError);
+      console.error('❌ Erro ao carregar transações:', transactionsError);
+    } else {
+      console.log('💰 Transações carregadas:', transactions?.length || 0);
+      console.log('📋 Detalhes das transações:', transactions);
     }
 
-    const monthlyIncome = transactions
-      ?.filter(t => t.transaction_type === 'receita')
-      .reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+    // Calcular receitas (amount sempre positivo no DB)
+    const receitas = transactions?.filter(t => t.transaction_type === 'receita') || [];
+    const monthlyIncome = receitas.reduce((sum, t) => {
+      const amount = parseFloat(t.amount) || 0;
+      return sum + Math.abs(amount);
+    }, 0);
 
-    const monthlyExpenses = transactions
-      ?.filter(t => t.transaction_type === 'despesa')
-      .reduce((sum, t) => sum + Math.abs(t.amount || 0), 0) || 0;
+    // Calcular despesas (amount sempre positivo no DB)
+    const despesas = transactions?.filter(t => t.transaction_type === 'despesa') || [];
+    const monthlyExpenses = despesas.reduce((sum, t) => {
+      const amount = parseFloat(t.amount) || 0;
+      return sum + Math.abs(amount);
+    }, 0);
+
+    const savings = monthlyIncome - monthlyExpenses;
+
+    console.log('📊 Stats calculados:', {
+      totalBalance,
+      monthlyIncome,
+      monthlyExpenses,
+      savings,
+      receitasCount: receitas.length,
+      despesasCount: despesas.length,
+      transactionsCount: transactions?.length || 0,
+      accountsCount: accounts?.length || 0
+    });
 
     setStats({
       totalBalance,
       monthlyIncome,
       monthlyExpenses,
-      savings: monthlyIncome - monthlyExpenses
+      savings
     });
   };
 
@@ -176,7 +218,7 @@ export default function DashboardPage() {
 
     // Buscar categorias se houver category_id
     const categoryIds = [...new Set(data.map((t: any) => t.category_id).filter(Boolean))];
-    let categoriesMap = new Map<string, { name: string; color: string }>();
+    const categoriesMap = new Map<string, { name: string; color: string }>();
     
     if (categoryIds.length > 0) {
       const { data: categories } = await supabase
@@ -243,7 +285,7 @@ export default function DashboardPage() {
 
     // Buscar categorias se houver category_id
     const categoryIds = [...new Set(data.map((t: any) => t.category_id).filter(Boolean))];
-    let categoriesMap = new Map<string, string>();
+    const categoriesMap = new Map<string, string>();
     
     if (categoryIds.length > 0) {
       const { data: categories } = await supabase

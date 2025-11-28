@@ -207,23 +207,47 @@ export default function BudgetPage() {
         savings_amount: budget.savings_amount
       };
 
-      const { data, error } = await supabase
+      // Primeiro, verificar se já existe um orçamento com esses critérios
+      const { data: existingBudget } = await supabase
         .from('budgets')
-        .upsert(budgetData, {
-          onConflict: 'user_id,month_year,methodology'
-        })
-        .select()
-        .single();
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('month_year', currentMonth)
+        .eq('methodology', activeTab)
+        .maybeSingle();
 
-      if (error) throw error;
+      let result;
+      if (existingBudget?.id) {
+        // Atualizar orçamento existente
+        const { data, error } = await supabase
+          .from('budgets')
+          .update(budgetData)
+          .eq('id', existingBudget.id)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = data;
+      } else {
+        // Criar novo orçamento
+        const { data, error } = await supabase
+          .from('budgets')
+          .insert(budgetData)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = data;
+      }
 
-      setBudget({ ...budget, id: data.id });
+      setBudget({ ...budget, id: result.id });
       setEditing(false);
       
       alert('Orçamento salvo com sucesso!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao salvar orçamento:', error);
-      alert('Erro ao salvar orçamento');
+      const errorMessage = error?.message || 'Erro desconhecido ao salvar orçamento';
+      alert(`Erro ao salvar orçamento: ${errorMessage}`);
     } finally {
       setSaving(false);
     }
