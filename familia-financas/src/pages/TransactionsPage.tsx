@@ -359,8 +359,7 @@ export default function TransactionsPage() {
     setAutoCategorizing(true);
     try {
       // Usar a mesma lógica de URL do upload de PDF
-      // Em produção (Vercel/Railway), usar a URL do backend configurada ou a URL do Railway conhecida
-      const backendUrl = import.meta.env.VITE_API_URL || 'https://minimax-familia-orcamento-production.up.railway.app';
+      const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
       
       console.log('🔗 URL do backend para auto-categorização:', backendUrl);
       
@@ -481,8 +480,7 @@ export default function TransactionsPage() {
       setUploadProgress('Enviando PDF para processamento...');
 
       // URL do backend (Railway ou local)
-      // Em produção (Vercel/Railway), usar a URL do backend configurada ou a URL do Railway conhecida
-      const backendUrl = import.meta.env.VITE_API_URL || 'https://minimax-familia-orcamento-production.up.railway.app';
+      const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
       // 1. Enviar PDF para o backend
       const formData = new FormData();
