@@ -358,7 +358,10 @@ export default function TransactionsPage() {
     
     setAutoCategorizing(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/auto-categorize`, {
+      // Usar a mesma lógica de URL do upload de PDF
+      const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      
+      const response = await fetch(`${backendUrl}/api/auto-categorize`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -388,12 +391,19 @@ export default function TransactionsPage() {
       }
     } catch (error: any) {
       console.error('Erro na auto-categorização:', error);
+      
+      // Tratamento específico para erro de conexão
+      let errorMessage = error.message || 'Tente novamente mais tarde.';
+      if (error.message && error.message.includes('Failed to fetch')) {
+        errorMessage = 'Não foi possível conectar ao servidor backend. Verifique se ele está rodando.';
+      }
+
       setResultModal({
         isOpen: true,
         type: 'error',
         title: 'Erro na Auto-categorização',
         message: 'Não foi possível categorizar as transações.',
-        details: error.message || 'Tente novamente mais tarde.'
+        details: errorMessage
       });
     } finally {
       setAutoCategorizing(false);
