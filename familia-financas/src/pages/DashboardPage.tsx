@@ -17,7 +17,8 @@ import {
   AlertCircle,
   CheckCircle,
   Info,
-  ArrowRight
+  ArrowRight,
+  X
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
@@ -48,6 +49,7 @@ interface Alert {
   type: 'warning' | 'success' | 'info';
   title: string;
   message: string;
+  code: string; // Identificador único do tipo de alerta para persistência
 }
 
 const COLORS = ['#0066FF', '#00C853', '#FF6B00', '#FFD600', '#9C27B0', '#00BCD4', '#F44336'];
@@ -315,6 +317,26 @@ export default function DashboardPage() {
   const loadAlerts = async () => {
     if (!user) return;
 
+    const currentMonthYear = new Date().toISOString().slice(0, 7); // YYYY-MM
+    console.log('🔍 Carregando alertas para:', currentMonthYear);
+
+    // 1. Buscar alertas dispensados neste mês
+    const { data: acknowledgments, error: ackError } = await supabase
+      .from('alert_acknowledgments')
+      .select('alert_type')
+      .eq('user_id', user.id)
+      .eq('month_year', currentMonthYear);
+
+    if (ackError) {
+      console.error('❌ Erro ao carregar alertas dispensados:', ackError);
+    } else {
+      console.log('✅ Alertas dispensados:', acknowledgments);
+    }
+
+    const dismissedTypes = new Set(acknowledgments?.map(a => a.alert_type) || []);
+    console.log('🗑️ Tipos dispensados:', Array.from(dismissedTypes));
+
+    // 2. Buscar alertas configurados no banco
     const { data } = await supabase
       .from('alerts')
       .select('*')
@@ -323,56 +345,103 @@ export default function DashboardPage() {
       .order('created_at', { ascending: false })
       .limit(3);
 
-    if (!data || data.length === 0) {
-      // Alertas mock baseados nos dados
-      const mockAlerts: Alert[] = [];
+    const finalAlerts: Alert[] = [];
 
-      if (stats.monthlyExpenses > stats.monthlyIncome * 0.9) {
+    // Processar alertas do banco
+    if (data && data.length > 0) {
+      data.forEach((a: any) => {
+        if (!dismissedTypes.has(a.alert_type)) {
+          finalAlerts.push({
+            id: a.id,
+            type: a.alert_type === 'spending_limit' ? 'warning' : a.alert_type === 'goal_achieved' ? 'success' : 'info',
+            title: a.alert_title,
+            message: a.message,
+            code: a.alert_type
+          });
+        }
+      });
+    }
+
+    // 3. Gerar alertas mocks (apenas se não tiver alertas suficientes do banco ou complementar)
+    if (finalAlerts.length < 3) { // Se tiver espaço para mais alertas
+      
+      // Mock 1: Orçamento Limite
+      if (!dismissedTypes.has('spending_limit_warning') && stats.monthlyExpenses > stats.monthlyIncome * 0.9 && stats.monthlyIncome > 0) {
         const alertTitle = language === 'pt-PT' ? 'Atenção: Orçamento próximo do limite' : 'Atenção: Orçamento próximo do limite';
         const alertMessage = language === 'pt-PT' 
           ? `Já gastou ${formatCurrency(stats.monthlyExpenses)} de ${formatCurrency(stats.monthlyIncome)} este mês.`
           : `Você já gastou ${formatCurrency(stats.monthlyExpenses)} de ${formatCurrency(stats.monthlyIncome)} este mês.`;
         
-        mockAlerts.push({
-          id: '1',
+        finalAlerts.push({
+          id: 'mock-1',
           type: 'warning',
           title: alertTitle,
-          message: alertMessage
+          message: alertMessage,
+          code: 'spending_limit_warning'
         });
       }
 
-      if (stats.savings > 0) {
+      // Mock 2: Economia
+      if (!dismissedTypes.has('savings_success') && stats.savings > 0) {
         const successMessage = language === 'pt-PT' 
           ? `Conseguiu economizar ${formatCurrency(stats.savings)} este mês.`
           : `Você conseguiu economizar ${formatCurrency(stats.savings)} este mês.`;
           
-        mockAlerts.push({
-          id: '2',
+        finalAlerts.push({
+          id: 'mock-2',
           type: 'success',
           title: 'Parabéns! Você está economizando',
-          message: successMessage
+          message: successMessage,
+          code: 'savings_success'
         });
       }
 
-      mockAlerts.push({
-        id: '3',
-        type: 'info',
-        title: 'Dica: Importe seus extratos',
-        message: 'Faça upload dos seus extratos bancários para categorização automática.'
-      });
-
-      setAlerts(mockAlerts);
-      return;
+      // Mock 3: Dica
+      if (!dismissedTypes.has('import_tip_info')) {
+        finalAlerts.push({
+          id: 'mock-3',
+          type: 'info',
+          title: 'Dica: Importe seus extratos',
+          message: 'Faça upload dos seus extratos bancários para categorização automática.',
+          code: 'import_tip_info'
+        });
+      }
     }
 
-    setAlerts(
-      data.map((a: any) => ({
-        id: a.id,
-        type: a.alert_type === 'spending_limit' ? 'warning' : a.alert_type === 'goal_achieved' ? 'success' : 'info',
-        title: a.alert_title,
-        message: a.message
-      }))
-    );
+    console.log('📢 Alertas finais:', finalAlerts);
+    setAlerts(finalAlerts.slice(0, 3));
+  };
+
+  const handleDismissAlert = async (alert: Alert) => {
+    if (!user) return;
+
+    console.log('🚫 Dispensando alerta:', alert);
+
+    // Otimisticamente remover da UI
+    setAlerts(prev => prev.filter(a => a.id !== alert.id));
+
+    const currentMonthYear = new Date().toISOString().slice(0, 7); // YYYY-MM
+
+    try {
+      const { error } = await supabase
+        .from('alert_acknowledgments')
+        .insert({
+          user_id: user.id,
+          alert_type: alert.code,
+          month_year: currentMonthYear
+        });
+      
+      if (error) {
+        console.error('❌ Erro Supabase ao dispensar:', error);
+        throw error;
+      }
+      
+      console.log('✅ Alerta dispensado no banco com sucesso');
+    } catch (error) {
+      console.error('❌ Erro ao dispensar alerta:', error);
+      // Se falhar, recarrega os alertas (opcional, mas bom para consistência)
+      loadAlerts();
+    }
   };
 
   const getAlertIcon = (type: string) => {
@@ -477,13 +546,20 @@ export default function DashboardPage() {
           {alerts.map((alert) => (
             <div
               key={alert.id}
-              className={`flex items-start gap-sm p-md rounded-base border ${getAlertStyles(alert.type)}`}
+              className={`flex items-start gap-sm p-md rounded-base border ${getAlertStyles(alert.type)} relative group`}
             >
               {getAlertIcon(alert.type)}
-              <div className="flex-1">
+              <div className="flex-1 pr-8">
                 <p className="font-semibold text-body">{alert.title}</p>
                 <p className="text-small mt-xs opacity-90">{alert.message}</p>
               </div>
+              <button 
+                onClick={() => handleDismissAlert(alert)}
+                className="absolute top-2 right-2 p-1 rounded-full hover:bg-black/10 transition-colors text-current opacity-60 hover:opacity-100"
+                title="Dispensar alerta este mês"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           ))}
         </div>

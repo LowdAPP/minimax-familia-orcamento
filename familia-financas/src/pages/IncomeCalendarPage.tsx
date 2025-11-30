@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useI18n } from '../hooks/useI18n';
+import { useAlert } from '../hooks/useAlert';
 import { supabase } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -79,6 +80,7 @@ const CATEGORY_LABELS = {
 export default function IncomeCalendarPage() {
   const { user } = useAuth();
   const { formatCurrency } = useI18n();
+  const { showAlert, AlertComponent } = useAlert();
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [patterns, setPatterns] = useState<IncomePattern[]>([]);
@@ -113,6 +115,11 @@ export default function IncomeCalendarPage() {
       }
     } catch (error) {
       console.error('Erro ao analisar padrões:', error);
+      showAlert({
+        type: 'error',
+        title: 'Erro na Análise',
+        message: 'Não foi possível analisar seus padrões de receita. Verifique sua conexão e tente novamente.',
+      });
     } finally {
       setAnalyzing(false);
       setLoading(false);
@@ -219,6 +226,7 @@ export default function IncomeCalendarPage() {
 
   return (
     <div className="space-y-lg">
+      <AlertComponent />
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-md">
         <div>

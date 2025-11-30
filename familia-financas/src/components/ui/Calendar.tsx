@@ -100,7 +100,7 @@ export function MonthPicker({ value, onChange, className = '' }: MonthPickerProp
                   key={monthString}
                   onClick={() => handleMonthSelect(month)}
                   className={`
-                    h-12 px-sm rounded-base text-small font-medium transition-all
+                    h-10 px-1 rounded-base text-xs font-medium transition-all
                     ${isSelected
                       ? 'bg-primary-500 text-white hover:bg-primary-600'
                       : 'bg-neutral-50 text-neutral-700 hover:bg-primary-50 hover:text-primary-600'

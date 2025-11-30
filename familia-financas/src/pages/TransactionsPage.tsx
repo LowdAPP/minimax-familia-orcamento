@@ -10,6 +10,8 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { ResultModal } from '../components/ui/Modal';
 import { MonthPicker } from '../components/ui/Calendar';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../components/ui/Accordion';
+import { useAlert } from '../hooks/useAlert';
 import {
   Upload,
   Download,
@@ -109,6 +111,7 @@ interface Account {
 export default function TransactionsPage() {
   const { user } = useAuth();
   const { t, formatCurrency, language } = useI18n();
+  const { showAlert, AlertComponent } = useAlert();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
@@ -159,6 +162,7 @@ export default function TransactionsPage() {
   const [bulkAccountId, setBulkAccountId] = useState('');
   const [showBulkCategoryModal, setShowBulkCategoryModal] = useState(false);
   const [bulkCategoryId, setBulkCategoryId] = useState('');
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
   // Duplicatas
   const [duplicates, setDuplicates] = useState<Map<string, Transaction[]>>(new Map());
@@ -662,7 +666,11 @@ export default function TransactionsPage() {
 
   const handleAddTransaction = async () => {
     if (!user || !newTransaction.description || newTransaction.amount === 0) {
-      alert('Preencha todos os campos obrigatórios');
+      showAlert({
+        type: 'warning',
+        title: 'Campos obrigatórios',
+        message: 'Preencha todos os campos obrigatórios'
+      });
       return;
     }
 
@@ -719,7 +727,11 @@ export default function TransactionsPage() {
       loadTransactions();
     } catch (error) {
       console.error('Erro ao adicionar transação:', error);
-      alert('Erro ao adicionar transação');
+      showAlert({
+        type: 'error',
+        title: 'Erro',
+        message: 'Erro ao adicionar transação'
+      });
     }
   };
 
@@ -744,7 +756,11 @@ export default function TransactionsPage() {
       loadTransactions();
     } catch (error) {
       console.error('Erro ao excluir transação:', error);
-      alert('Erro ao excluir transação. Tente novamente.');
+      showAlert({
+        type: 'error',
+        title: 'Erro',
+        message: 'Erro ao excluir transação. Tente novamente.'
+      });
     } finally {
       setDeleting(false);
     }
@@ -784,7 +800,11 @@ export default function TransactionsPage() {
 
   const handleEditConfirm = async () => {
     if (!transactionToEdit || !user || !editTransaction.description || editTransaction.amount === 0) {
-      alert('Preencha todos os campos obrigatórios');
+      showAlert({
+        type: 'warning',
+        title: 'Campos obrigatórios',
+        message: 'Preencha todos os campos obrigatórios'
+      });
       return;
     }
 
@@ -819,7 +839,11 @@ export default function TransactionsPage() {
       loadTransactions();
     } catch (error) {
       console.error('Erro ao editar transação:', error);
-      alert('Erro ao editar transação. Tente novamente.');
+      showAlert({
+        type: 'error',
+        title: 'Erro',
+        message: 'Erro ao editar transação. Tente novamente.'
+      });
     } finally {
       setEditing(false);
     }
@@ -967,6 +991,48 @@ export default function TransactionsPage() {
         type: 'error',
         title: 'Erro ao Atualizar',
         message: 'Erro ao atualizar categorias das transações.',
+        details: 'Tente novamente ou entre em contato com o suporte.'
+      });
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!user || selectedTransactions.size === 0) return;
+
+    setBulkUpdating(true);
+    try {
+      const transactionIds = Array.from(selectedTransactions);
+      
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('user_id', user.id)
+        .in('id', transactionIds);
+
+      if (error) throw error;
+
+      // Limpar seleção e recarregar
+      setSelectedTransactions(new Set());
+      setIsSelectionMode(false);
+      setShowBulkDeleteModal(false);
+      loadTransactions();
+
+      setResultModal({
+        isOpen: true,
+        type: 'success',
+        title: 'Transações Excluídas!',
+        message: `${transactionIds.length} transação${transactionIds.length !== 1 ? 'ões' : ''} excluída${transactionIds.length !== 1 ? 's' : ''} com sucesso!`,
+        details: 'As transações foram removidas permanentemente.'
+      });
+    } catch (error) {
+      console.error('Erro ao excluir transações em massa:', error);
+      setResultModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Erro ao Excluir',
+        message: 'Erro ao excluir transações selecionadas.',
         details: 'Tente novamente ou entre em contato com o suporte.'
       });
     } finally {
@@ -1201,76 +1267,84 @@ export default function TransactionsPage() {
 
       {/* Upload de Arquivos */}
       <Card>
-        <div className="flex flex-col gap-md">
-          <div className="flex-1">
-            <h3 className="text-body md:text-h4 font-bold text-neutral-900 mb-xs">
-              Importar Extrato Bancário
-            </h3>
-            <p className="text-small text-neutral-600">
-              Faça upload do arquivo do seu banco (PDF, CSV ou Excel) para importação automática de transações
-            </p>
-          </div>
-          
-          {/* Seleção de conta */}
-          {accounts.length > 0 ? (
-            <div>
-              <label className="block text-small font-medium text-neutral-700 mb-xs">
-                Conta <span className="text-error-500">*</span>
-              </label>
-              <select
-                value={selectedAccountForUpload}
-                onChange={(e) => setSelectedAccountForUpload(e.target.value)}
-                disabled={uploading}
-                className="w-full h-12 px-sm rounded-base border border-neutral-200 focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="">Selecione uma conta</option>
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.nickname}{account.institution ? ` - ${account.institution}` : ''}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-neutral-500 mt-xs">
-                As transações do PDF serão associadas a esta conta
-              </p>
-            </div>
-          ) : (
-            <div className="p-sm bg-warning-50 border border-warning-200 rounded-base">
-              <p className="text-small text-warning-700">
-                ⚠️ Nenhuma conta disponível. Uma conta padrão será criada automaticamente.
-              </p>
-            </div>
-          )}
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="import" className="border-none">
+            <AccordionTrigger className="hover:no-underline py-0">
+              <div className="flex flex-col items-start text-left gap-1">
+                <h3 className="text-body md:text-h4 font-bold text-neutral-900">
+                  Importar Extrato Bancário
+                </h3>
+                <p className="text-small text-neutral-600 font-normal">
+                  Faça upload do arquivo do seu banco (PDF, CSV ou Excel) para importação automática de transações
+                </p>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-md pb-0">
+              <div className="flex flex-col gap-md">
+                
+                {/* Seleção de conta */}
+                {accounts.length > 0 ? (
+                  <div>
+                    <label className="block text-small font-medium text-neutral-700 mb-xs">
+                      Conta <span className="text-error-500">*</span>
+                    </label>
+                    <select
+                      value={selectedAccountForUpload}
+                      onChange={(e) => setSelectedAccountForUpload(e.target.value)}
+                      disabled={uploading}
+                      className="w-full h-12 px-sm rounded-base border border-neutral-200 focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Selecione uma conta</option>
+                      {accounts.map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.nickname}{account.institution ? ` - ${account.institution}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-neutral-500 mt-xs">
+                      As transações do PDF serão associadas a esta conta
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-sm bg-warning-50 border border-warning-200 rounded-base">
+                    <p className="text-small text-warning-700">
+                      ⚠️ Nenhuma conta disponível. Uma conta padrão será criada automaticamente.
+                    </p>
+                  </div>
+                )}
 
-          <div className="w-full sm:w-auto">
-            <label htmlFor="file-upload" className="block w-full sm:w-auto">
-              <input
-                id="file-upload"
-                type="file"
-                accept=".pdf,.csv,.xls,.xlsx,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                onChange={handleFileUpload}
-                disabled={uploading || (accounts.length > 0 && !selectedAccountForUpload)}
-                className="hidden"
-              />
-              <Button
-                variant="primary"
-                as="span"
-                loading={uploading}
-                disabled={uploading || (accounts.length > 0 && !selectedAccountForUpload)}
-                fullWidth
-                className="sm:w-auto"
-              >
-                <Upload className="w-4 h-4" />
-                {uploading ? 'Processando...' : 'Enviar Arquivo'}
-              </Button>
-            </label>
-          </div>
-        </div>
-        {uploadProgress && (
-          <div className="mt-md p-sm bg-info-50 border border-info-200 rounded-base">
-            <p className="text-small text-info-700 break-words">{uploadProgress}</p>
-          </div>
-        )}
+                <div className="w-full sm:w-auto">
+                  <label htmlFor="file-upload" className="block w-full sm:w-auto">
+                    <input
+                      id="file-upload"
+                      type="file"
+                      accept=".pdf,.csv,.xls,.xlsx,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      onChange={handleFileUpload}
+                      disabled={uploading || (accounts.length > 0 && !selectedAccountForUpload)}
+                      className="hidden"
+                    />
+                    <Button
+                      variant="primary"
+                      as="span"
+                      loading={uploading}
+                      disabled={uploading || (accounts.length > 0 && !selectedAccountForUpload)}
+                      fullWidth
+                      className="sm:w-auto"
+                    >
+                      <Upload className="w-4 h-4" />
+                      {uploading ? 'Processando...' : 'Enviar Arquivo'}
+                    </Button>
+                  </label>
+                </div>
+              </div>
+              {uploadProgress && (
+                <div className="mt-md p-sm bg-info-50 border border-info-200 rounded-base">
+                  <p className="text-small text-info-700 break-words">{uploadProgress}</p>
+                </div>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </Card>
 
       {/* Alerta de Duplicatas */}
@@ -1437,6 +1511,17 @@ export default function TransactionsPage() {
                 className="sm:w-auto"
               >
                 Alterar Categoria
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setShowBulkDeleteModal(true)}
+                disabled={selectedTransactions.size === 0}
+                fullWidth
+                className="bg-error-600 hover:bg-error-700 sm:w-auto"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Excluir ({selectedTransactions.size})
               </Button>
             </div>
           </div>
@@ -2318,6 +2403,53 @@ export default function TransactionsPage() {
         </div>
       )}
 
+      {/* Modal: Confirmação de Exclusão em Massa */}
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-sm z-50 overflow-y-auto">
+          <Card className="max-w-md w-full m-sm max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center gap-md mb-lg">
+              <div className="w-12 h-12 rounded-full bg-error-100 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-6 h-6 text-error-600" />
+              </div>
+              <div>
+                <h3 className="text-h4 font-bold text-neutral-900">Excluir {selectedTransactions.size} Transações?</h3>
+                <p className="text-small text-neutral-600">Esta ação não pode ser desfeita</p>
+              </div>
+            </div>
+
+            <div className="bg-neutral-50 rounded-base p-md mb-lg">
+              <p className="text-body text-neutral-700">
+                Você tem certeza que deseja excluir permanentemente as <strong>{selectedTransactions.size} transações selecionadas</strong>?
+              </p>
+              <p className="text-small text-neutral-500 mt-sm">
+                O valor total dessas transações será removido do seu saldo.
+              </p>
+            </div>
+
+            <div className="flex gap-sm">
+              <Button
+                variant="ghost"
+                onClick={() => setShowBulkDeleteModal(false)}
+                fullWidth
+                disabled={bulkUpdating}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleBulkDelete}
+                fullWidth
+                loading={bulkUpdating}
+                disabled={bulkUpdating}
+                className="bg-error-500 hover:bg-error-600"
+              >
+                Excluir {selectedTransactions.size} Transações
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
       {/* Modal: Resultado do Upload */}
       <ResultModal
         isOpen={resultModal.isOpen}
@@ -2329,6 +2461,9 @@ export default function TransactionsPage() {
         transactionCount={resultModal.transactionCount}
         transactionsFound={resultModal.transactionsFound}
       />
+
+      {/* Alert Modal */}
+      <AlertComponent />
     </div>
   );
 }

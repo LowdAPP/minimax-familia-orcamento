@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useI18n } from '../hooks/useI18n';
 import { supabase } from '../lib/supabase';
+import { useAlert } from '../hooks/useAlert';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -47,6 +48,7 @@ const COLORS = {
 export default function BudgetPage() {
   const { user, profile } = useAuth();
   const { t, formatCurrency, language } = useI18n();
+  const { showAlert, AlertComponent } = useAlert();
   const [activeTab, setActiveTab] = useState<Methodology>('50_30_20');
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -243,11 +245,19 @@ export default function BudgetPage() {
       setBudget({ ...budget, id: result.id });
       setEditing(false);
       
-      alert('Orçamento salvo com sucesso!');
+      showAlert({
+        type: 'success',
+        title: 'Sucesso!',
+        message: 'Orçamento salvo com sucesso!'
+      });
     } catch (error: any) {
       console.error('Erro ao salvar orçamento:', error);
       const errorMessage = error?.message || 'Erro desconhecido ao salvar orçamento';
-      alert(`Erro ao salvar orçamento: ${errorMessage}`);
+      showAlert({
+        type: 'error',
+        title: 'Erro ao salvar',
+        message: `Erro ao salvar orçamento: ${errorMessage}`
+      });
     } finally {
       setSaving(false);
     }
@@ -639,6 +649,9 @@ export default function BudgetPage() {
           </Card>
         </div>
       )}
+
+      {/* Alert Modal */}
+      <AlertComponent />
     </div>
   );
 }

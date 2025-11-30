@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useI18n } from '../hooks/useI18n';
 import { supabase } from '../lib/supabase';
+import { useAlert } from '../hooks/useAlert';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -54,6 +55,7 @@ interface DebtSimulation {
 export default function GoalsPage() {
   const { user } = useAuth();
   const { t, formatCurrency, language } = useI18n();
+  const { showAlert, AlertComponent } = useAlert();
   const [loading, setLoading] = useState(true);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
@@ -185,7 +187,11 @@ export default function GoalsPage() {
 
   const handleAddGoal = async () => {
     if (!user || !newGoal.goal_name || newGoal.target_amount <= 0) {
-      alert('Preencha todos os campos obrigatórios');
+      showAlert({
+        type: 'warning',
+        title: 'Campos obrigatórios',
+        message: 'Preencha todos os campos obrigatórios'
+      });
       return;
     }
 
@@ -217,13 +223,21 @@ export default function GoalsPage() {
       await loadGoals();
     } catch (error: any) {
       console.error('Erro ao adicionar meta:', error);
-      alert(error.message || 'Erro ao adicionar meta. Verifique a conexão com o banco de dados.');
+      showAlert({
+        type: 'error',
+        title: 'Erro ao adicionar',
+        message: error.message || 'Erro ao adicionar meta. Verifique a conexão com o banco de dados.'
+      });
     }
   };
 
   const handleAddDebt = async () => {
     if (!user || !newDebt.debt_name || newDebt.current_balance <= 0) {
-      alert('Preencha todos os campos obrigatórios');
+      showAlert({
+        type: 'warning',
+        title: 'Campos obrigatórios',
+        message: 'Preencha todos os campos obrigatórios'
+      });
       return;
     }
 
@@ -257,13 +271,21 @@ export default function GoalsPage() {
       await loadDebts();
     } catch (error: any) {
       console.error('Erro ao adicionar dívida:', error);
-      alert(error.message || 'Erro ao adicionar dívida. Verifique a conexão com o banco de dados.');
+      showAlert({
+        type: 'error',
+        title: 'Erro ao adicionar',
+        message: error.message || 'Erro ao adicionar dívida. Verifique a conexão com o banco de dados.'
+      });
     }
   };
 
   const handleSimulateDebt = async () => {
     if (debts.length === 0) {
-      alert('Adicione suas dívidas primeiro');
+      showAlert({
+        type: 'info',
+        title: 'Nenhuma dívida',
+        message: 'Adicione suas dívidas primeiro'
+      });
       return;
     }
 
@@ -854,6 +876,9 @@ export default function GoalsPage() {
           </Card>
         </div>
       )}
+
+      {/* Alert Modal */}
+      <AlertComponent />
     </div>
   );
 }
