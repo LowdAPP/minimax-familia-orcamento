@@ -754,6 +754,11 @@ function parseTransactionsFromText(text, userId, accountId, tenantId) {
       name: 'Formato Tabela',
       // Data | Descrição | Valor
       regex: /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s*[|\t]\s*(.+?)\s*[|\t]\s*([\+\-]?\s*\d{1,10}(?:[.,]\d{3})*[.,]\d{2})/gi
+    },
+    {
+      name: 'Formato CSV/Exportação',
+      // Data,Data,Descrição,Valor (ex: 24-11-2025,24-11-2025,Lidl Montijo,-67.77)
+      regex: /(\d{2}-\d{2}-\d{4}),(\d{2}-\d{2}-\d{4}),(.+?),([\+\-]?\d+(?:\.\d+)?)/gi
     }
   ];
 
@@ -954,6 +959,11 @@ function parseTransactionsFromText(text, userId, accountId, tenantId) {
 
         if (pattern.name.includes('Duplicada')) {
           // Formato com data duplicada: usa primeira data
+          dateStr = match[1];
+          description = match[3];
+          amountStr = match[4];
+        } else if (pattern.name.includes('CSV')) {
+          // Formato CSV: Data, Data, Descrição, Valor
           dateStr = match[1];
           description = match[3];
           amountStr = match[4];
