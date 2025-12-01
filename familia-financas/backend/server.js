@@ -857,11 +857,13 @@ async function parseTransactionsFromText(text, userId, accountId, tenantId) {
       // Data | Descrição | Valor
       regex: /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s*[|\t]\s*(.+?)\s*[|\t]\s*([\+\-]?\s*\d{1,10}(?:[.,]\d{3})*[.,]\d{2})/gi
     },
+    /*
     {
       name: 'Formato CSV/Exportação',
       // Data,Data,Descrição,Valor (ex: 24-11-2025,24-11-2025,Lidl Montijo,-67.77)
       regex: /(\d{2}-\d{2}-\d{4}),(\d{2}-\d{2}-\d{4}),(.+?),([\+\-]?\d+(?:\.\d+)?)/gi
     }
+    */
   ];
 
   // Tenta cada padrão
@@ -1146,7 +1148,7 @@ async function parseTransactionsFromText(text, userId, accountId, tenantId) {
             merchant: extractMerchant(description),
             transaction_type: amount > 0 ? 'receita' : 'despesa',
             status: 'confirmed',
-            source: 'pdf_import'
+            source: 'regex_import'
           });
         }
       } catch (error) {
