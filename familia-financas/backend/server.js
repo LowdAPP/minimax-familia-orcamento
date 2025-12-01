@@ -1233,21 +1233,26 @@ async function parseTransactionsFromText(text, userId, accountId, tenantId) {
           merchant: extractMerchant(description),
           transaction_type: amount > 0 ? 'receita' : 'despesa',
           status: 'confirmed',
-          source: 'pdf_import'
+          source: 'regex_import' // Diferenciando de ai_import
         });
       }
     }
   }
 
-  console.log(`[PARSE] ✅ Total de ${transactions.length} transações parseadas`);
+  console.log(`[PARSE] ✅ Total de ${transactions.length} transações parseadas via Regex`);
   
   // Fallback para Gemini (AI) se não encontrou nada ou muito pouco
   if (transactions.length < 2) {
-    console.log('[PARSE] ⚠️ Poucas transações encontradas com Regex. Tentando Gemini AI...');
+    console.log('[PARSE] ⚠️ Poucas transações encontradas com Regex (< 2). Iniciando fallback para Gemini AI...');
     try {
       const aiTransactions = await parseTransactionsWithGemini(text);
+      
+      console.log(`[PARSE] 📊 Comparativo: Regex encontrou ${transactions.length} vs Gemini encontrou ${aiTransactions.length}`);
+
       if (aiTransactions.length > transactions.length) {
-        console.log(`[PARSE] 🤖 Gemini encontrou ${aiTransactions.length} transações. Usando resultado da AI.`);
+        console.log(`[PARSE] 🤖 Gemini venceu! Usando ${aiTransactions.length} transações da IA.`);
+        console.log('[PARSE] 🔍 Exemplo de transação AI:', JSON.stringify(aiTransactions[0]));
+        
         // Adicionar IDs e retornar
         return aiTransactions.map(t => ({
           ...t,
@@ -1255,10 +1260,14 @@ async function parseTransactionsFromText(text, userId, accountId, tenantId) {
           account_id: accountId,
           tenant_id: tenantId
         }));
+      } else {
+        console.log(`[PARSE] 📉 Gemini não encontrou mais transações que o Regex. Mantendo Regex.`);
       }
     } catch (error) {
-      console.error('[PARSE] ❌ Erro no fallback AI:', error);
+      console.error('[PARSE] ❌ Erro crítico no fallback AI:', error);
     }
+  } else {
+    console.log(`[PARSE] 🚀 Regex foi suficiente (${transactions.length} transações). Pulando Gemini.`);
   }
 
   return transactions;
