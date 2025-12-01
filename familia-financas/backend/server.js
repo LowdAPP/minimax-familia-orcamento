@@ -5,6 +5,7 @@ const pdfParse = require('pdf-parse');
 const { parse } = require('csv-parse/sync');
 const xlsx = require('xlsx');
 const { createClient } = require('@supabase/supabase-js');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const PORT = process.env.PORT || 3000;
 
 // Inicializar cliente Supabase
@@ -720,8 +721,78 @@ function parseTransactionsFromExcel(excelBuffer, userId, accountId, tenantId) {
   }
 }
 
+// Função para parsear com Gemini (AI)
+async function parseTransactionsWithGemini(text) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.log('[AI] ⚠️ GEMINI_API_KEY não configurada. Pulando parse com AI.');
+    return [];
+  }
+
+  try {
+    console.log('[AI] 🤖 Iniciando análise com Gemini 1.5 Flash...');
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = `
+      Você é um especialista em extração de dados bancários. Analise o texto abaixo de um extrato bancário e extraia TODAS as transações financeiras.
+      
+      TEXTO DO EXTRATO:
+      """
+      ${text.substring(0, 30000)} 
+      """
+      
+      INSTRUÇÕES:
+      1. Identifique cada transação com: Data, Descrição, Valor e Nome do Estabelecimento (Merchant).
+      2. Ignore saldos parciais, cabeçalhos e rodapés.
+      3. Para o valor: 
+         - Se for saída/débito, deve ser negativo (ex: -10.50).
+         - Se for entrada/crédito, deve ser positivo (ex: 1500.00).
+         - Use ponto como separador decimal.
+      4. Converta a data para o formato ISO YYYY-MM-DD.
+      5. Retorne APENAS um array JSON válido, sem markdown, sem explicações.
+      
+      Exemplo de formato de saída:
+      [
+        { "transaction_date": "2025-11-28", "description": "COMPRA SUPERMERCADO", "amount": -50.25, "merchant": "SUPERMERCADO" },
+        { "transaction_date": "2025-11-27", "description": "SALARIO MENSAL", "amount": 2500.00, "merchant": "EMPRESA XYZ" }
+      ]
+    `;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const textResponse = response.text();
+    
+    // Limpar markdown se houver
+    const jsonString = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    const transactions = JSON.parse(jsonString);
+    
+    if (!Array.isArray(transactions)) {
+      console.error('[AI] ❌ Resposta da AI não é um array:', textResponse.substring(0, 100));
+      return [];
+    }
+
+    console.log(`[AI] ✅ Gemini encontrou ${transactions.length} transações!`);
+    
+    return transactions.map(t => ({
+      transaction_date: t.transaction_date,
+      amount: parseFloat(t.amount),
+      description: t.description,
+      merchant: t.merchant || extractMerchant(t.description),
+      transaction_type: t.amount > 0 ? 'receita' : 'despesa',
+      status: 'confirmed',
+      source: 'pdf_import_ai'
+    }));
+
+  } catch (error) {
+    console.error('[AI] ❌ Erro ao processar com Gemini:', error.message);
+    return [];
+  }
+}
+
 // Função para extrair transações do texto do PDF
-function parseTransactionsFromText(text, userId, accountId, tenantId) {
+async function parseTransactionsFromText(text, userId, accountId, tenantId) {
   const transactions = [];
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
@@ -1169,6 +1240,27 @@ function parseTransactionsFromText(text, userId, accountId, tenantId) {
   }
 
   console.log(`[PARSE] ✅ Total de ${transactions.length} transações parseadas`);
+  
+  // Fallback para Gemini (AI) se não encontrou nada ou muito pouco
+  if (transactions.length < 2) {
+    console.log('[PARSE] ⚠️ Poucas transações encontradas com Regex. Tentando Gemini AI...');
+    try {
+      const aiTransactions = await parseTransactionsWithGemini(text);
+      if (aiTransactions.length > transactions.length) {
+        console.log(`[PARSE] 🤖 Gemini encontrou ${aiTransactions.length} transações. Usando resultado da AI.`);
+        // Adicionar IDs e retornar
+        return aiTransactions.map(t => ({
+          ...t,
+          user_id: userId,
+          account_id: accountId,
+          tenant_id: tenantId
+        }));
+      }
+    } catch (error) {
+      console.error('[PARSE] ❌ Erro no fallback AI:', error);
+    }
+  }
+
   return transactions;
 }
 
@@ -1701,7 +1793,7 @@ const server = http.createServer(async (req, res) => {
         const pdfData = await pdfParse(fileBuffer);
         const text = pdfData.text;
         console.log(`[${timestamp}] 📖 PDF parseado: ${pdfData.numpages} páginas, ${text.length} caracteres`);
-        transactions = parseTransactionsFromText(text, userId, accountId, tenantId);
+        transactions = await parseTransactionsFromText(text, userId, accountId, tenantId);
         fileInfo = { pdfPages: pdfData.numpages, fileType: 'pdf' };
       } else if (isCSV) {
         console.log(`[${timestamp}] 📊 Processando como CSV...`);
