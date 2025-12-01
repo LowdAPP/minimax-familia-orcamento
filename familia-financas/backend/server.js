@@ -1416,6 +1416,7 @@ const server = http.createServer(async (req, res) => {
   const timestamp = new Date().toISOString();
   // Log apenas método e URL para evitar vazar dados sensíveis em query params (embora não devamos usar query params sensíveis)
   console.log(`[${timestamp}] ${req.method} ${req.url.split('?')[0]}`);
+  console.log(`[VERSION] v1.1.0 - CSV Parser Fix Deploy`);
 
   // CORS Configuration
   // Permite configurar origens permitidas via variável de ambiente (separadas por vírgula)
