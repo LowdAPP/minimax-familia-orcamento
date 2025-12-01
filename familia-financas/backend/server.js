@@ -875,13 +875,12 @@ async function parseTransactionsFromText(text, userId, accountId, tenantId) {
       // Data | Descrição | Valor
       regex: /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s*[|\t]\s*(.+?)\s*[|\t]\s*([\+\-]?\s*\d{1,10}(?:[.,]\d{3})*[.,]\d{2})/gi
     },
-    /*
     {
-      name: 'Formato CSV/Exportação',
-      // Data,Data,Descrição,Valor (ex: 24-11-2025,24-11-2025,Lidl Montijo,-67.77)
-      regex: /(\d{2}-\d{2}-\d{4}),(\d{2}-\d{2}-\d{4}),(.+?),([\+\-]?\d+(?:\.\d+)?)/gi
+      name: 'Formato CSV Santander (Fallback)',
+      // Data,Data,Descrição,Valor,Saldo (ex: 28-11-2025,28-11-2025,Auchan,-2.29,-990.57)
+      // Captura: 1=Data, 3=Descrição, 4=Valor
+      regex: /(\d{2}-\d{2}-\d{4}),(?:\d{2}-\d{2}-\d{4}),(.+?),(-?\d+\.\d+)(?:,|$)/gi
     }
-    */
   ];
 
   // Tenta cada padrão
@@ -1085,10 +1084,10 @@ async function parseTransactionsFromText(text, userId, accountId, tenantId) {
           description = match[3];
           amountStr = match[4];
         } else if (pattern.name.includes('CSV')) {
-          // Formato CSV: Data, Data, Descrição, Valor
+          // Formato CSV Santander: Data, (ignored), Descrição, Valor
           dateStr = match[1];
-          description = match[3];
-          amountStr = match[4];
+          description = match[2]; // Mudou índice por causa do (?:...)
+          amountStr = match[3];   // Mudou índice
         } else {
           // Formato simples
           dateStr = match[1];
