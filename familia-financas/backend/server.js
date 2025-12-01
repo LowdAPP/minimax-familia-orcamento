@@ -763,11 +763,28 @@ async function parseTransactionsWithGemini(text) {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const textResponse = response.text();
+
+    console.log('[AI] 📝 Resposta Bruta do Gemini:', textResponse.substring(0, 500) + '...');
     
-    // Limpar markdown se houver
-    const jsonString = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    // Tenta extrair JSON array do texto (busca por [ ... ])
+    let jsonString = textResponse;
+    const jsonMatch = textResponse.match(/\[[\s\S]*\]/);
     
-    const transactions = JSON.parse(jsonString);
+    if (jsonMatch) {
+      jsonString = jsonMatch[0];
+    } else {
+      // Fallback: tenta limpar markdown
+      jsonString = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    }
+    
+    let transactions;
+    try {
+      transactions = JSON.parse(jsonString);
+    } catch (jsonError) {
+      console.error('[AI] ❌ Erro ao parsear JSON:', jsonError.message);
+      console.log('[AI] 📄 JSON tentado:', jsonString.substring(0, 200));
+      return [];
+    }
     
     if (!Array.isArray(transactions)) {
       console.error('[AI] ❌ Resposta da AI não é um array:', textResponse.substring(0, 100));
