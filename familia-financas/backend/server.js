@@ -1814,8 +1814,10 @@ const server = http.createServer(async (req, res) => {
         transactions = await parseTransactionsFromText(text, userId, accountId, tenantId);
         fileInfo = { pdfPages: pdfData.numpages, fileType: 'pdf' };
       } else if (isCSV) {
-        console.log(`[${timestamp}] 📊 Processando como CSV...`);
-        transactions = parseTransactionsFromCSV(fileBuffer, userId, accountId, tenantId);
+        console.log(`[${timestamp}] 📊 Processando como CSV (via Gemini AI First)...`);
+        // Converte buffer para texto e usa a função inteligente com Gemini
+        const csvText = fileBuffer.toString('utf-8');
+        transactions = await parseTransactionsFromText(csvText, userId, accountId, tenantId);
         fileInfo = { fileType: 'csv' };
       } else if (isXLS) {
         console.log(`[${timestamp}] 📊 Processando como Excel...`);
