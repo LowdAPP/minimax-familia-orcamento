@@ -1284,7 +1284,7 @@ async function parseTransactionsFromText(text, userId, accountId, tenantId) {
           merchant: extractMerchant(description),
           transaction_type: amount > 0 ? 'receita' : 'despesa',
           status: 'confirmed',
-          source: 'regex_import' // Diferenciando de ai_import
+          source: 'pdf_import' // Mantendo compatibilidade com constraint do banco
         });
       }
     }
