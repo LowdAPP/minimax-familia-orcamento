@@ -793,6 +793,37 @@ async function parseTransactionsWithGemini(text) {
 
 // Função para extrair transações do texto do PDF
 async function parseTransactionsFromText(text, userId, accountId, tenantId) {
+  // ==================================================================================
+  // 🤖 ESTRATÉGIA "AI FIRST": Tentar parsear com Gemini AI primeiro
+  // ==================================================================================
+  console.log('[PARSE] 🤖 Iniciando parsing via Gemini AI (Prioridade Alta)...');
+  try {
+    const aiTransactions = await parseTransactionsWithGemini(text);
+    
+    if (aiTransactions && aiTransactions.length > 0) {
+      console.log(`[PARSE] 🤖 Gemini VENCEU! Encontrou ${aiTransactions.length} transações com inteligência.`);
+      console.log('[PARSE] 🔍 Exemplo de transação AI:', JSON.stringify(aiTransactions[0]));
+      
+      // Retorna imediatamente se a IA funcionou
+      return aiTransactions.map(t => ({
+        ...t,
+        user_id: userId,
+        account_id: accountId,
+        tenant_id: tenantId
+      }));
+    } else {
+      console.log('[PARSE] ⚠️ Gemini retornou 0 transações ou falhou na validação. Iniciando fallback para Regex...');
+    }
+  } catch (error) {
+    console.error('[PARSE] ❌ Erro ao executar Gemini AI First:', error.message);
+    console.log('[PARSE] 🔄 Iniciando fallback para Regex Tradicional...');
+  }
+
+  // ==================================================================================
+  // 🔄 ESTRATÉGIA "FALLBACK": Regex tradicional (apenas se AI falhar)
+  // ==================================================================================
+  console.log('[PARSE] 🔄 Executando parsing via Regex (Modo Fallback)...');
+
   const transactions = [];
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
@@ -1241,35 +1272,6 @@ async function parseTransactionsFromText(text, userId, accountId, tenantId) {
 
   console.log(`[PARSE] ✅ Total de ${transactions.length} transações parseadas via Regex`);
   
-  // Fallback para Gemini (AI) se não encontrou nada ou muito pouco
-  if (transactions.length < 2) {
-    console.log('[PARSE] ⚠️ Poucas transações encontradas com Regex (< 2). Iniciando fallback para Gemini AI...');
-    try {
-      const aiTransactions = await parseTransactionsWithGemini(text);
-      
-      console.log(`[PARSE] 📊 Comparativo: Regex encontrou ${transactions.length} vs Gemini encontrou ${aiTransactions.length}`);
-
-      if (aiTransactions.length > transactions.length) {
-        console.log(`[PARSE] 🤖 Gemini venceu! Usando ${aiTransactions.length} transações da IA.`);
-        console.log('[PARSE] 🔍 Exemplo de transação AI:', JSON.stringify(aiTransactions[0]));
-        
-        // Adicionar IDs e retornar
-        return aiTransactions.map(t => ({
-          ...t,
-          user_id: userId,
-          account_id: accountId,
-          tenant_id: tenantId
-        }));
-      } else {
-        console.log(`[PARSE] 📉 Gemini não encontrou mais transações que o Regex. Mantendo Regex.`);
-      }
-    } catch (error) {
-      console.error('[PARSE] ❌ Erro crítico no fallback AI:', error);
-    }
-  } else {
-    console.log(`[PARSE] 🚀 Regex foi suficiente (${transactions.length} transações). Pulando Gemini.`);
-  }
-
   return transactions;
 }
 
