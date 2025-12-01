@@ -800,7 +800,7 @@ async function parseTransactionsWithGemini(text) {
       merchant: t.merchant || extractMerchant(t.description),
       transaction_type: t.amount > 0 ? 'receita' : 'despesa',
       status: 'confirmed',
-      source: 'pdf_import_ai'
+      source: 'pdf_import' // Mantendo compatibilidade com constraint do banco
     }));
 
   } catch (error) {
@@ -1166,7 +1166,7 @@ async function parseTransactionsFromText(text, userId, accountId, tenantId) {
             merchant: extractMerchant(description),
             transaction_type: amount > 0 ? 'receita' : 'despesa',
             status: 'confirmed',
-            source: 'regex_import'
+            source: 'pdf_import' // Mantendo compatibilidade com constraint do banco
           });
         }
       } catch (error) {
