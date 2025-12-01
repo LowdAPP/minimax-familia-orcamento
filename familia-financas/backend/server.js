@@ -1271,7 +1271,10 @@ async function checkDuplicatesInDB(transactions, userId) {
   try {
     console.log(`[DB] 🔍 Verificando duplicatas no banco para ${transactions.length} transações...`);
     
-    // Buscar transações existentes do usuário no mesmo período
+    // Pegar o account_id da primeira transação (assumindo que todas são para a mesma conta no lote)
+    const accountId = transactions[0].account_id;
+
+    // Buscar transações existentes do usuário no mesmo período e MESMA CONTA
     const dates = transactions.map(t => t.transaction_date);
     const minDate = dates.reduce((a, b) => a < b ? a : b);
     const maxDate = dates.reduce((a, b) => a > b ? a : b);
@@ -1280,6 +1283,7 @@ async function checkDuplicatesInDB(transactions, userId) {
       .from('transactions')
       .select('transaction_date, description, amount')
       .eq('user_id', userId)
+      .eq('account_id', accountId) // Filtrar também pela conta!
       .gte('transaction_date', minDate)
       .lte('transaction_date', maxDate);
     
