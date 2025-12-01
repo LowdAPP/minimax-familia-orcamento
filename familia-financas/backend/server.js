@@ -730,9 +730,10 @@ async function parseTransactionsWithGemini(text) {
   }
 
   try {
-    console.log('[AI] 🤖 Iniciando análise com Gemini 1.5 Flash...');
+    console.log('[AI] 🤖 Iniciando análise com Gemini 2.0 Flash...');
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // Usando gemini-2.0-flash que está disponível na conta
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `
       Você é um especialista em extração de dados bancários. Analise o texto abaixo de um extrato bancário e extraia TODAS as transações financeiras.
