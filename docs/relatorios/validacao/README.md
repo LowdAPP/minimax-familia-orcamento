@@ -20,3 +20,5 @@ Este diretório contém relatórios de validação, resumos executivos e relató
 
 Estes relatórios consolidam validações e correções aplicadas no sistema, servindo como referência histórica e documentação de decisões técnicas.
 
+
+

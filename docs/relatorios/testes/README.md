@@ -38,3 +38,5 @@ Este diretório contém relatórios detalhados de testes funcionais realizados n
 - [Test Progress](./test-progress.md)
 - [Instruções Teste Manual Completo](./INSTRUCOES_TESTE_MANUAL_COMPLETO.md)
 
+
+

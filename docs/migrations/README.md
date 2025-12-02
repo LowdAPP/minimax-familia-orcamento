@@ -14,3 +14,5 @@ Este diretório contém documentação sobre migrations do banco de dados e corr
 - Faça backup do banco antes de aplicar migrations em produção
 - Teste migrations em ambiente de desenvolvimento primeiro
 
+
+

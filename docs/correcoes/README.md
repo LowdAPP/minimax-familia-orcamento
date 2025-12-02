@@ -27,3 +27,5 @@ Este diretório contém documentação sobre correções de bugs, issues e probl
 
 As correções estão organizadas por categoria para facilitar a localização e referência futura.
 
+
+

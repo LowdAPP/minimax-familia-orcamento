@@ -24,3 +24,5 @@ Este diretório contém todas as instruções e guias relacionados a deploy, con
 
 Todos os arquivos de deploy e configuração foram organizados aqui para facilitar a localização e manutenção das instruções de infraestrutura.
 
+
+

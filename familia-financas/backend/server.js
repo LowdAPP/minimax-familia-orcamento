@@ -1127,6 +1127,12 @@ async function parseTransactionsFromText(text, userId, accountId, tenantId) {
           .replace(/(?:EUR|€|R\$|\$|USD)\d+[.,]\d+(?:EUR|€|R\$|\$|USD)?/g, '')
           .trim();
 
+        // LIMPEZA EXTRA DA DESCRIÇÃO (Remove data e saldo se estiverem grudados)
+        if (description.length > 15) {
+          description = description.replace(/^\d{2}[\/\-]\d{2}[\/\-]\d{4}\s*/, '').trim();
+          description = description.replace(/[\+\-]?\s*\d{1,3}(?:\.\d{3})*,\d{2}\s*(?:EUR|€).*$/i, '').trim();
+        }
+
         // Validações
         if (description.length < 3 || description.length > 500) {
           console.log(`[PARSE] ⚠️ Descrição muito curta/longa: ${description.substring(0, 50)}`);
@@ -1259,8 +1265,18 @@ async function parseTransactionsFromText(text, userId, accountId, tenantId) {
         .replace(/(?:EUR|€|R\$|\$|USD)\d+[.,]\d+(?:EUR|€|R\$|\$|USD)?/g, '')
         .trim();
 
-      if (!amount || isNaN(amount) || Math.abs(amount) < 0.01) continue;
-      if (description.length < 3 || description.length > 500) continue;
+        if (!amount || isNaN(amount) || Math.abs(amount) < 0.01) continue;
+        
+        // LIMPEZA EXTRA DA DESCRIÇÃO (Remove data e saldo se estiverem grudados)
+        // Ex: "26-11-2025Farmacia Corvo-921,28 EUR" -> "Farmacia Corvo"
+        if (description.length > 15) {
+          // Remove data do início (ex: 26-11-2025...)
+          description = description.replace(/^\d{2}[\/\-]\d{2}[\/\-]\d{4}\s*/, '').trim();
+          // Remove saldo/valor do final (ex: ...-921,28 EUR)
+          description = description.replace(/[\+\-]?\s*\d{1,3}(?:\.\d{3})*,\d{2}\s*(?:EUR|€).*$/i, '').trim();
+        }
+
+        if (description.length < 3 || description.length > 500) continue;
       if (/^[\d\s\.\,\-\/\+€\$£EURR\$USD]+$/.test(description)) continue;
 
       const lowerDesc = description.toLowerCase();
