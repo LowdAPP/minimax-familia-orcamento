@@ -16,6 +16,29 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 let supabase = null;
 
+// Helper para limpeza de descrição
+function cleanDescription(desc) {
+  if (!desc) return '';
+  let clean = desc.trim();
+  
+  // Remove espaços múltiplos e tabs
+  clean = clean.replace(/\s+/g, ' ').replace(/[|\t]/g, ' ');
+  
+  // Remove data no início (ex: "05-11-2025Transferência" -> "Transferência")
+  clean = clean.replace(/^\d{2}[-/]\d{2}[-/]\d{4}\s*/, '');
+  
+  // Remove valor/saldo/moeda no final
+  // Ex: "Transferência-1.252,73 EUR" -> "Transferência"
+  // Ex: "Transferência -1.252,73 EUR" -> "Transferência"
+  // Regex: Hífen opcional, número com pontuação, EUR opcional, fim da linha
+  clean = clean.replace(/[\s-]*-?[\d.,]+\s*(?:EUR|€)?$/i, '');
+  
+  // Remove lixo de moeda solta no meio
+  clean = clean.replace(/(?:EUR|€|R\$|\$|USD)\d+[.,]\d+(?:EUR|€|R\$|\$|USD)?/g, '');
+  
+  return clean.trim();
+}
+
 if (supabaseUrl && supabaseServiceKey) {
   // Verificar se é Service Role Key (começa com 'eyJ' e é mais longa)
   const isServiceRole = supabaseServiceKey.length > 100;
@@ -1119,19 +1142,8 @@ async function parseTransactionsFromText(text, userId, accountId, tenantId) {
           amount = -amountValue;
         }
 
-        // Limpa descrição
-        description = description
-          .trim()
-          .replace(/\s+/g, ' ')
-          .replace(/[|\t]/g, ' ')
-          .replace(/(?:EUR|€|R\$|\$|USD)\d+[.,]\d+(?:EUR|€|R\$|\$|USD)?/g, '')
-          .trim();
-
-        // LIMPEZA EXTRA DA DESCRIÇÃO (Remove data e saldo se estiverem grudados)
-        if (description.length > 15) {
-          description = description.replace(/^\d{2}[\/\-]\d{2}[\/\-]\d{4}\s*/, '').trim();
-          description = description.replace(/[\+\-]?\s*\d{1,3}(?:\.\d{3})*,\d{2}\s*(?:EUR|€).*$/i, '').trim();
-        }
+        // Limpa descrição usando helper robusto
+        description = cleanDescription(description);
 
         // Validações
         if (description.length < 3 || description.length > 500) {
@@ -1259,24 +1271,12 @@ async function parseTransactionsFromText(text, userId, accountId, tenantId) {
         }
       }
 
-      description = description
-        .replace(/\s+/g, ' ')
-        .replace(/[|\t]/g, ' ')
-        .replace(/(?:EUR|€|R\$|\$|USD)\d+[.,]\d+(?:EUR|€|R\$|\$|USD)?/g, '')
-        .trim();
+      // Limpa descrição usando helper robusto
+      description = cleanDescription(description);
 
-        if (!amount || isNaN(amount) || Math.abs(amount) < 0.01) continue;
+      if (!amount || isNaN(amount) || Math.abs(amount) < 0.01) continue;
         
-        // LIMPEZA EXTRA DA DESCRIÇÃO (Remove data e saldo se estiverem grudados)
-        // Ex: "26-11-2025Farmacia Corvo-921,28 EUR" -> "Farmacia Corvo"
-        if (description.length > 15) {
-          // Remove data do início (ex: 26-11-2025...)
-          description = description.replace(/^\d{2}[\/\-]\d{2}[\/\-]\d{4}\s*/, '').trim();
-          // Remove saldo/valor do final (ex: ...-921,28 EUR)
-          description = description.replace(/[\+\-]?\s*\d{1,3}(?:\.\d{3})*,\d{2}\s*(?:EUR|€).*$/i, '').trim();
-        }
-
-        if (description.length < 3 || description.length > 500) continue;
+      if (description.length < 3 || description.length > 500) continue;
       if (/^[\d\s\.\,\-\/\+€\$£EURR\$USD]+$/.test(description)) continue;
 
       const lowerDesc = description.toLowerCase();
@@ -1602,7 +1602,7 @@ const server = http.createServer(async (req, res) => {
 
   if (allowOrigin) {
     res.setHeader('Access-Control-Allow-Origin', allowOrigin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, apikey, x-client-info');
     res.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight 24h
   }
