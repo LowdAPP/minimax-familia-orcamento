@@ -20,6 +20,7 @@ let supabase = null;
 function cleanDescription(desc) {
   if (!desc) return '';
   let clean = desc.trim();
+  const original = clean;
   
   // Remove espaços múltiplos e tabs
   clean = clean.replace(/\s+/g, ' ').replace(/[|\t]/g, ' ');
@@ -28,15 +29,19 @@ function cleanDescription(desc) {
   clean = clean.replace(/^\d{2}[-/]\d{2}[-/]\d{4}\s*/, '');
   
   // Remove valor/saldo/moeda no final
-  // Ex: "Transferência-1.252,73 EUR" -> "Transferência"
-  // Ex: "Transferência -1.252,73 EUR" -> "Transferência"
-  // Regex: Hífen opcional, número com pontuação, EUR opcional, fim da linha
-  clean = clean.replace(/[\s-]*-?[\d.,]+\s*(?:EUR|€)?$/i, '');
+  // Ex: "Apple-1.273,33 EUR" -> "Apple"
+  // Regex: Separador opcional (hífen/espaço), Valor monetário, Moeda opcional, Fim da linha
+  const balanceRegex = /[\s-]*(-?\d{1,3}(?:[.,]\d{3})*[.,]\d{2})\s*(?:EUR|€|R\$|\$|USD)?$/i;
+  clean = clean.replace(balanceRegex, '');
   
   // Remove lixo de moeda solta no meio
   clean = clean.replace(/(?:EUR|€|R\$|\$|USD)\d+[.,]\d+(?:EUR|€|R\$|\$|USD)?/g, '');
   
-  return clean.trim();
+  const final = clean.trim();
+  if (original !== final && original.length > 15) {
+     console.log(`[CLEAN] '${original}' -> '${final}'`); 
+  }
+  return final;
 }
 
 if (supabaseUrl && supabaseServiceKey) {
