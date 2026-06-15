@@ -90,3 +90,41 @@ export interface Goal {
   created_at: string;
   updated_at: string;
 }
+
+export interface FixedBill {
+  id: string;
+  user_id: string;
+  tenant_id?: string | null;
+  name: string;
+  amount: number;
+  due_day: number;
+  category_id?: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FixedBillPayment {
+  id: string;
+  fixed_bill_id: string;
+  user_id: string;
+  tenant_id?: string | null;
+  month_year: string; // 'YYYY-MM'
+  is_paid: boolean;
+  paid_date?: string | null;
+  transaction_id?: string | null;
+  amount_paid?: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WeeklyLimit {
+  id: string;
+  user_id: string;
+  tenant_id?: string | null;
+  category_id: string;
+  month_year: string;
+  weekly_amount: number;
+  created_at: string;
+  updated_at: string;
+}
