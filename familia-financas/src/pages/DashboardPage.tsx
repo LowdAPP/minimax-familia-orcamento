@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useI18n } from '../hooks/useI18n';
 import { supabase } from '../lib/supabase';
+import type { FixedBill, FixedBillPayment } from '../lib/supabase';
+import { committedAmount, availableAmount, daysRemaining } from '../lib/finance/cashflow';
 import { Card, StatCard } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import {
@@ -17,7 +19,9 @@ import {
   AlertCircle,
   CheckCircle,
   Info,
-  ArrowRight
+  ArrowRight,
+  Lock,
+  CalendarClock
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
@@ -65,6 +69,12 @@ export default function DashboardPage() {
   const [categoryExpenses, setCategoryExpenses] = useState<CategoryExpense[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [cashflow, setCashflow] = useState({
+    available: 0,
+    committed: 0,
+    daysLeft: 0,
+    savingsBalance: 0,
+  });
 
   useEffect(() => {
     if (user) {
@@ -86,13 +96,58 @@ export default function DashboardPage() {
         loadStats(),
         loadCategoryExpenses(),
         loadRecentTransactions(),
-        loadAlerts()
+        loadAlerts(),
+        loadCashflow()
       ]);
     } catch (error) {
       console.error('Erro ao carregar dados do dashboard:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadCashflow = async () => {
+    if (!user) return;
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1; // 1-12
+    const day = now.getDate();
+    const monthYear = now.toISOString().slice(0, 7);
+
+    const { data: accounts } = await supabase
+      .from('accounts')
+      .select('current_balance, account_type, is_active')
+      .eq('user_id', user.id)
+      .eq('is_active', true);
+
+    const checking = (accounts || [])
+      .filter((a: any) => a.account_type === 'conta_corrente')
+      .reduce((s: number, a: any) => s + Number(a.current_balance || 0), 0);
+    const savingsBalance = (accounts || [])
+      .filter((a: any) => a.account_type === 'poupanca')
+      .reduce((s: number, a: any) => s + Number(a.current_balance || 0), 0);
+
+    const { data: billsData } = await supabase
+      .from('fixed_bills')
+      .select('id, amount, is_active')
+      .eq('user_id', user.id)
+      .eq('is_active', true);
+    const { data: payData } = await supabase
+      .from('fixed_bill_payments')
+      .select('fixed_bill_id, is_paid, amount_paid')
+      .eq('user_id', user.id)
+      .eq('month_year', monthYear);
+
+    const bills = (billsData || []) as FixedBill[];
+    const payments = (payData || []) as FixedBillPayment[];
+    const committed = committedAmount(bills, payments);
+
+    setCashflow({
+      available: availableAmount(checking, committed),
+      committed,
+      daysLeft: daysRemaining(year, month, day),
+      savingsBalance,
+    });
   };
 
   const loadStats = async () => {
@@ -440,6 +495,30 @@ export default function DashboardPage() {
             </Button>
           </Link>
         </div>
+      </div>
+
+      {/* Cashflow Cards: Disponível / Comprometido / Dias restantes / Já poupado */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-md">
+        <StatCard
+          icon={<Wallet className="w-5 h-5" />}
+          label="Disponível"
+          value={formatCurrency(cashflow.available)}
+        />
+        <StatCard
+          icon={<Lock className="w-5 h-5" />}
+          label="Comprometido"
+          value={formatCurrency(cashflow.committed)}
+        />
+        <StatCard
+          icon={<CalendarClock className="w-5 h-5" />}
+          label="Dias restantes"
+          value={String(cashflow.daysLeft)}
+        />
+        <StatCard
+          icon={<PiggyBank className="w-5 h-5" />}
+          label="Já poupado"
+          value={formatCurrency(cashflow.savingsBalance)}
+        />
       </div>
 
       {/* Stats Grid */}

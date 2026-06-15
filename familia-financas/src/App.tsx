@@ -12,7 +12,9 @@ import DashboardPage from './pages/DashboardPage';
 import TransactionsPage from './pages/TransactionsPage';
 import BudgetPage from './pages/BudgetPage';
 import CategoriesPage from './pages/CategoriesPage';
+import FixedBillsPage from './pages/FixedBillsPage';
 import IncomeCalendarPage from './pages/IncomeCalendarPage';
+import WeeklyReviewPage from './pages/WeeklyReviewPage';
 import GoalsPage from './pages/GoalsPage';
 import SettingsPage from './pages/SettingsPage';
 
@@ -97,6 +99,16 @@ function App() {
             }
           />
           <Route
+            path="/fixed-bills"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <FixedBillsPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/categories"
             element={
               <ProtectedRoute>
@@ -112,6 +124,16 @@ function App() {
               <ProtectedRoute>
                 <DashboardLayout>
                   <IncomeCalendarPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/weekly-review"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <WeeklyReviewPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
