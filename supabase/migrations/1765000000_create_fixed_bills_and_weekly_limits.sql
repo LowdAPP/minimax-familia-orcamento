@@ -51,22 +51,28 @@ CREATE INDEX IF NOT EXISTS idx_weekly_limits_user ON weekly_limits(user_id);
 
 -- 4. RLS
 ALTER TABLE fixed_bills ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Multitenant Manage Fixed Bills" ON fixed_bills;
 CREATE POLICY "Multitenant Manage Fixed Bills" ON fixed_bills FOR ALL
     USING (auth.uid() = user_id AND (tenant_id IS NULL OR tenant_id = get_auth_tenant_id()))
     WITH CHECK (auth.uid() = user_id AND (tenant_id IS NULL OR tenant_id = get_auth_tenant_id()));
+DROP POLICY IF EXISTS "Service Role Full Access Fixed Bills" ON fixed_bills;
 CREATE POLICY "Service Role Full Access Fixed Bills" ON fixed_bills FOR ALL
     TO service_role USING (true) WITH CHECK (true);
 
 ALTER TABLE fixed_bill_payments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Multitenant Manage Bill Payments" ON fixed_bill_payments;
 CREATE POLICY "Multitenant Manage Bill Payments" ON fixed_bill_payments FOR ALL
     USING (auth.uid() = user_id AND (tenant_id IS NULL OR tenant_id = get_auth_tenant_id()))
     WITH CHECK (auth.uid() = user_id AND (tenant_id IS NULL OR tenant_id = get_auth_tenant_id()));
+DROP POLICY IF EXISTS "Service Role Full Access Bill Payments" ON fixed_bill_payments;
 CREATE POLICY "Service Role Full Access Bill Payments" ON fixed_bill_payments FOR ALL
     TO service_role USING (true) WITH CHECK (true);
 
 ALTER TABLE weekly_limits ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Multitenant Manage Weekly Limits" ON weekly_limits;
 CREATE POLICY "Multitenant Manage Weekly Limits" ON weekly_limits FOR ALL
     USING (auth.uid() = user_id AND (tenant_id IS NULL OR tenant_id = get_auth_tenant_id()))
     WITH CHECK (auth.uid() = user_id AND (tenant_id IS NULL OR tenant_id = get_auth_tenant_id()));
+DROP POLICY IF EXISTS "Service Role Full Access Weekly Limits" ON weekly_limits;
 CREATE POLICY "Service Role Full Access Weekly Limits" ON weekly_limits FOR ALL
     TO service_role USING (true) WITH CHECK (true);
