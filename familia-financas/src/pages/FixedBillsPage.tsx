@@ -106,7 +106,10 @@ export default function FixedBillsPage() {
 
   const remove = async (bill: FixedBill) => {
     if (!confirm(`Apagar a conta fixa "${bill.name}"?`)) return;
-    const { error } = await supabase.from('fixed_bills').delete().eq('id', bill.id);
+    const { error } = await supabase
+      .from('fixed_bills')
+      .update({ is_active: false })
+      .eq('id', bill.id);
     if (error) {
       alert(error.message || 'Erro ao apagar');
       return;
