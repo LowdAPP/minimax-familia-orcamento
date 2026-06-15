@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useI18n } from '../hooks/useI18n';
 import { supabase } from '../lib/supabase';
+import { monthRange, sumAbsByCategory } from '../lib/finance/cashflow';
 import { useAlert } from '../hooks/useAlert';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -14,7 +15,9 @@ import {
   AlertCircle,
   Check,
   Edit,
-  Save
+  Save,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { PieChart as RechartsPie, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
@@ -54,6 +57,24 @@ export default function BudgetPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   
+  const [selectedMonth, setSelectedMonth] = useState<string>(() =>
+    new Date().toISOString().slice(0, 7)
+  );
+
+  const shiftMonth = (delta: number) => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const monthLabel = (() => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString(
+      language === 'pt-PT' ? 'pt-PT' : 'pt-BR',
+      { month: 'long', year: 'numeric' }
+    );
+  })();
+  
   const [budget, setBudget] = useState<Budget>({
     budget_name: 'Orçamento Atual',
     methodology: '50_30_20',
@@ -70,7 +91,7 @@ export default function BudgetPage() {
     if (user) {
       loadData();
     }
-  }, [user, activeTab]);
+  }, [user, activeTab, selectedMonth]);
 
   const loadData = async () => {
     setLoading(true);
@@ -90,7 +111,7 @@ export default function BudgetPage() {
   const loadBudget = async () => {
     if (!user) return;
 
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    const currentMonth = selectedMonth;
     
     const { data } = await supabase
       .from('budgets')
@@ -195,7 +216,7 @@ export default function BudgetPage() {
 
     setSaving(true);
     try {
-      const currentMonth = new Date().toISOString().slice(0, 7);
+      const currentMonth = selectedMonth;
       
       const budgetData = {
         user_id: user.id,
@@ -300,6 +321,25 @@ export default function BudgetPage() {
           <p className="text-body text-neutral-600 mt-xs">
             Gerencie seu orçamento com diferentes metodologias
           </p>
+          <div className="flex items-center gap-sm mt-sm">
+            <button
+              onClick={() => shiftMonth(-1)}
+              className="p-xs text-neutral-600 hover:text-primary-500 hover:bg-neutral-100 rounded-base"
+              title="Mês anterior"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-body font-semibold text-neutral-900 capitalize min-w-[140px] text-center">
+              {monthLabel}
+            </span>
+            <button
+              onClick={() => shiftMonth(1)}
+              className="p-xs text-neutral-600 hover:text-primary-500 hover:bg-neutral-100 rounded-base"
+              title="Próximo mês"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
         </div>
         <div className="flex gap-sm">
           {editing ? (
