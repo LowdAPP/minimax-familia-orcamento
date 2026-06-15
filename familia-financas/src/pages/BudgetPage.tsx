@@ -86,6 +86,7 @@ export default function BudgetPage() {
 
   const [categoryBudgets, setCategoryBudgets] = useState<CategoryBudget[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [spentByCategory, setSpentByCategory] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (user) {
@@ -99,7 +100,8 @@ export default function BudgetPage() {
       await Promise.all([
         loadBudget(),
         loadCategories(),
-        loadCategoryBudgets()
+        loadCategoryBudgets(),
+        loadSpent()
       ]);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -161,6 +163,20 @@ export default function BudgetPage() {
         category_type: item.categories.category_type
       })) || []
     );
+  };
+
+  const loadSpent = async () => {
+    if (!user) return;
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const { startISO, endISO } = monthRange(y, m);
+    const { data } = await supabase
+      .from('transactions')
+      .select('amount, category_id')
+      .eq('user_id', user.id)
+      .eq('transaction_type', 'despesa')
+      .gte('transaction_date', startISO)
+      .lte('transaction_date', endISO);
+    setSpentByCategory(sumAbsByCategory((data || []) as any));
   };
 
   const calculateBudget = async () => {
@@ -296,6 +312,15 @@ export default function BudgetPage() {
     if (percentage >= 80) return 'bg-warning-500';
     return 'bg-success-500';
   };
+
+  const spentForTypes = (types: string[]) =>
+    categories
+      .filter((c: any) => types.includes(c.category_type))
+      .reduce((s: number, c: any) => s + (spentByCategory[c.id] || 0), 0);
+
+  const needsSpent = spentForTypes(['essencial', 'divida']);
+  const wantsSpent = spentForTypes(['superfluo']);
+  const savingsSpent = spentForTypes(['poupanca']);
 
   // Dados para gráfico 50/30/20
   const fiftyThirtyTwentyData = [
@@ -461,6 +486,9 @@ export default function BudgetPage() {
                   <p className="text-h4 font-bold text-blue-900">
                     {formatCurrency(budget.total_income * 0.5)}
                   </p>
+                  <p className="text-small text-blue-700 mt-xs font-semibold">
+                    Gasto real: {formatCurrency(needsSpent)}
+                  </p>
                   <p className="text-small text-blue-600 mt-xs">
                     Moradia, alimentação, transporte, saúde
                   </p>
@@ -471,6 +499,9 @@ export default function BudgetPage() {
                   <p className="text-h4 font-bold text-orange-900">
                     {formatCurrency(budget.total_income * 0.3)}
                   </p>
+                  <p className="text-small text-orange-700 mt-xs font-semibold">
+                    Gasto real: {formatCurrency(wantsSpent)}
+                  </p>
                   <p className="text-small text-orange-600 mt-xs">
                     Lazer, restaurantes, compras não essenciais
                   </p>
@@ -480,6 +511,9 @@ export default function BudgetPage() {
                   <p className="text-small text-green-700 font-semibold mb-xs">Poupança (20%)</p>
                   <p className="text-h4 font-bold text-green-900">
                     {formatCurrency(budget.total_income * 0.2)}
+                  </p>
+                  <p className="text-small text-green-700 mt-xs font-semibold">
+                    Gasto real: {formatCurrency(savingsSpent)}
                   </p>
                   <p className="text-small text-green-600 mt-xs">
                     Reserva de emergência, investimentos, aposentadoria
@@ -535,7 +569,8 @@ export default function BudgetPage() {
                 categories.map((category) => {
                   const categoryBudget = categoryBudgets.find(cb => cb.category_id === category.id);
                   const allocated = categoryBudget?.allocated_amount || 0;
-                  const spent = categoryBudget?.spent_amount || 0;
+                  const spent = spentByCategory[category.id] || 0;
+                  const remaining = allocated - spent;
                   const percentage = getProgressPercentage(spent, allocated);
 
                   return (
@@ -545,6 +580,11 @@ export default function BudgetPage() {
                           <p className="text-body font-semibold text-neutral-900">{category.name}</p>
                           <p className="text-small text-neutral-600">
                             Gasto: {formatCurrency(spent)} de {formatCurrency(allocated)}
+                            {allocated > 0 && (
+                              <span className={remaining < 0 ? 'text-error-600 font-semibold' : 'text-success-600'}>
+                                {' · '}Resta {formatCurrency(remaining)}
+                              </span>
+                            )}
                           </p>
                         </div>
                         <div className="w-32">
