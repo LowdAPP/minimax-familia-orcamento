@@ -88,9 +88,11 @@ export default function FixedBillsPage() {
         is_active: true,
       };
       if (editing) {
-        await supabase.from('fixed_bills').update(payload).eq('id', editing.id);
+        const { error } = await supabase.from('fixed_bills').update(payload).eq('id', editing.id);
+        if (error) throw error;
       } else {
-        await supabase.from('fixed_bills').insert(payload);
+        const { error } = await supabase.from('fixed_bills').insert(payload);
+        if (error) throw error;
       }
       await load();
       setShowModal(false);
@@ -104,7 +106,11 @@ export default function FixedBillsPage() {
 
   const remove = async (bill: FixedBill) => {
     if (!confirm(`Apagar a conta fixa "${bill.name}"?`)) return;
-    await supabase.from('fixed_bills').delete().eq('id', bill.id);
+    const { error } = await supabase.from('fixed_bills').delete().eq('id', bill.id);
+    if (error) {
+      alert(error.message || 'Erro ao apagar');
+      return;
+    }
     await load();
   };
 
@@ -120,9 +126,13 @@ export default function FixedBillsPage() {
       paid_date: nextPaid ? new Date().toISOString().slice(0, 10) : null,
       amount_paid: nextPaid ? bill.amount : null,
     };
-    await supabase
+    const { error } = await supabase
       .from('fixed_bill_payments')
       .upsert(payload, { onConflict: 'fixed_bill_id,month_year' });
+    if (error) {
+      alert(error.message || 'Erro ao atualizar pagamento');
+      return;
+    }
     await load();
   };
 
@@ -131,7 +141,11 @@ export default function FixedBillsPage() {
     setSaving(true);
     try {
       const rows = RECOMMENDED.map((r) => ({ ...r, user_id: user.id, is_active: true }));
-      await supabase.from('fixed_bills').insert(rows);
+      const { error } = await supabase.from('fixed_bills').insert(rows);
+      if (error) {
+        alert(error.message || 'Erro ao criar contas recomendadas');
+        return;
+      }
       await load();
     } finally {
       setSaving(false);
