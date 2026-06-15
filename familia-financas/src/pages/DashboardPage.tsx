@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useI18n } from '../hooks/useI18n';
 import { supabase } from '../lib/supabase';
 import type { FixedBill, FixedBillPayment } from '../lib/supabase';
-import { committedAmount, availableAmount, paidThisMonth, daysRemaining } from '../lib/finance/cashflow';
+import { committedAmount, availableAmount, daysRemaining } from '../lib/finance/cashflow';
 import { Card, StatCard } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import {
@@ -72,7 +72,6 @@ export default function DashboardPage() {
   const [cashflow, setCashflow] = useState({
     available: 0,
     committed: 0,
-    paid: 0,
     daysLeft: 0,
     savingsBalance: 0,
   });
@@ -146,7 +145,6 @@ export default function DashboardPage() {
     setCashflow({
       available: availableAmount(checking, committed),
       committed,
-      paid: paidThisMonth(payments),
       daysLeft: daysRemaining(year, month, day),
       savingsBalance,
     });
