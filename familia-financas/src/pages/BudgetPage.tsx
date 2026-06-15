@@ -179,6 +179,27 @@ export default function BudgetPage() {
     setSpentByCategory(sumAbsByCategory((data || []) as any));
   };
 
+  const setAllocated = (categoryId: string, value: number, categoryType: CategoryBudget['category_type']) => {
+    setCategoryBudgets((prev) => {
+      const exists = prev.find((cb) => cb.category_id === categoryId);
+      if (exists) {
+        return prev.map((cb) =>
+          cb.category_id === categoryId ? { ...cb, allocated_amount: value } : cb
+        );
+      }
+      return [
+        ...prev,
+        {
+          category_id: categoryId,
+          category_name: '',
+          allocated_amount: value,
+          spent_amount: 0,
+          category_type: categoryType,
+        },
+      ];
+    });
+  };
+
   const calculateBudget = async () => {
     if (!user) return;
 
@@ -279,9 +300,12 @@ export default function BudgetPage() {
         result = data;
       }
 
+      await persistBudgetItems(result.id);
+
       setBudget({ ...budget, id: result.id });
       setEditing(false);
-      
+      await loadData();
+
       showAlert({
         type: 'success',
         title: 'Sucesso!',
@@ -300,7 +324,34 @@ export default function BudgetPage() {
     }
   };
 
-
+  const persistBudgetItems = async (budgetId: string) => {
+    for (const cb of categoryBudgets) {
+      if (cb.allocated_amount == null) continue;
+      const { data: existing } = await supabase
+        .from('budget_items')
+        .select('id')
+        .eq('budget_id', budgetId)
+        .eq('category_id', cb.category_id)
+        .maybeSingle();
+      if (existing?.id) {
+        const { error } = await supabase
+          .from('budget_items')
+          .update({ allocated_amount: cb.allocated_amount })
+          .eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('budget_items')
+          .insert({
+            budget_id: budgetId,
+            category_id: cb.category_id,
+            allocated_amount: cb.allocated_amount,
+            spent_amount: 0,
+          });
+        if (error) throw error;
+      }
+    }
+  };
 
   const getProgressPercentage = (spent: number, allocated: number) => {
     if (allocated === 0) return 0;
@@ -592,6 +643,9 @@ export default function BudgetPage() {
                             type="number"
                             placeholder="0,00"
                             value={allocated || ''}
+                            onChange={(e) =>
+                              setAllocated(category.id, parseFloat(e.target.value) || 0, category.category_type)
+                            }
                             disabled={!editing}
                             step="0.01"
                             className="text-right"
@@ -691,6 +745,10 @@ export default function BudgetPage() {
                     <Input
                       type="number"
                       placeholder="0,00"
+                      value={(categoryBudgets.find(cb => cb.category_id === category.id)?.allocated_amount) || ''}
+                      onChange={(e) =>
+                        setAllocated(category.id, parseFloat(e.target.value) || 0, category.category_type)
+                      }
                       disabled={!editing}
                       step="0.01"
                       className="text-right"
