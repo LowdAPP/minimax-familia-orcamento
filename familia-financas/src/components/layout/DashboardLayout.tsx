@@ -14,6 +14,7 @@ import {
   X,
   TrendingUp,
   Calendar,
+  CalendarCheck,
   Tag,
   User
 } from 'lucide-react';
@@ -35,6 +36,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     { path: '/fixed-bills', label: 'Contas Fixas', icon: Receipt },
     { path: '/categories', label: 'Categorias', icon: Tag },
     { path: '/income-calendar', label: 'Calendário', icon: Calendar },
+    { path: '/weekly-review', label: 'Reunião Semanal', icon: CalendarCheck },
     { path: '/goals', label: 'Metas e Dívidas', icon: Target },
     { path: '/learn', label: 'Aprender', icon: GraduationCap },
     { path: '/settings', label: 'Configurações', icon: Settings },
