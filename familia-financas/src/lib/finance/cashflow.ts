@@ -86,3 +86,25 @@ export function sumInRange(items: DatedAmount[], startISO: string, endISO: strin
     .filter((i) => i.transaction_date >= startISO && i.transaction_date <= endISO)
     .reduce((sum, i) => sum + i.amount, 0);
 }
+
+/** Intervalo ISO do mês inteiro [1º dia, último dia]. month = 1-12. */
+export function monthRange(year: number, month: number): { startISO: string; endISO: string } {
+  const last = daysInMonth(year, month);
+  const mm = String(month).padStart(2, '0');
+  return {
+    startISO: `${year}-${mm}-01`,
+    endISO: `${year}-${mm}-${String(last).padStart(2, '0')}`,
+  };
+}
+
+/** Soma Math.abs(amount) agrupada por category_id. Itens sem category_id são ignorados. */
+export function sumAbsByCategory(
+  items: { category_id?: string | null; amount: number }[]
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const it of items) {
+    if (!it.category_id) continue;
+    out[it.category_id] = (out[it.category_id] ?? 0) + Math.abs(it.amount);
+  }
+  return out;
+}
