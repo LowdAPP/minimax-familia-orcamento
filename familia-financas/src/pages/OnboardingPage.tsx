@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useI18n } from '../hooks/useI18n';
 import { supabase } from '../lib/supabase';
+import { useAlert } from '../hooks/useAlert';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
@@ -46,6 +47,7 @@ interface OnboardingData {
 export default function OnboardingPage() {
   const { user, updateProfile, profile } = useAuth();
   const { t, formatCurrency, language } = useI18n();
+  const { showAlert, AlertComponent } = useAlert();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const refazer = searchParams.get('refazer') === 'true';
@@ -268,7 +270,11 @@ export default function OnboardingPage() {
       navigate('/dashboard', { replace: true });
     } catch (error) {
       console.error('Erro ao completar onboarding:', error);
-      alert('Erro ao salvar dados. Por favor, tente novamente.');
+      showAlert({
+        type: 'error',
+        title: 'Erro',
+        message: 'Erro ao salvar dados. Por favor, tente novamente.'
+      });
     } finally {
       setLoading(false);
     }
@@ -796,6 +802,9 @@ export default function OnboardingPage() {
           </div>
         </Card>
       </div>
+
+      {/* Alert Modal */}
+      <AlertComponent />
     </div>
   );
 }

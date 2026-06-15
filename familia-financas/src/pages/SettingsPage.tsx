@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useI18n } from '../hooks/useI18n';
 import { supabase } from '../lib/supabase';
+import { useAlert } from '../hooks/useAlert';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -40,6 +41,7 @@ interface AlertConfig {
 
 export default function SettingsPage() {
   const { user, profile, updateProfile, signOut } = useAuth();
+  const { showAlert, AlertComponent } = useAlert();
   const { t, setLanguage, language, formatCurrency } = useI18n();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -116,10 +118,10 @@ export default function SettingsPage() {
 
     if (data) {
       setAlertConfig({
-        budget_limit: data.some(a => a.alert_type === 'spending_limit'),
-        bill_reminder: data.some(a => a.alert_type === 'bill_reminder'),
-        unusual_spending: data.some(a => a.alert_type === 'unusual_spending'),
-        savings_opportunity: data.some(a => a.alert_type === 'savings_opportunity')
+        budget_limit: data.some(a => a.alert_type === 'envelope_limit'), // Atualizado
+        bill_reminder: data.some(a => a.alert_type === 'due_date'), // Atualizado
+        unusual_spending: data.some(a => a.alert_type === 'impulse_check'), // Atualizado
+        savings_opportunity: data.some(a => a.alert_type === 'free_balance') // Atualizado
       });
     }
   };
@@ -159,10 +161,18 @@ export default function SettingsPage() {
       // Atualizar o idioma imediatamente
       setLanguage(profileData.preferredLanguage, profile);
       
-      alert('Perfil atualizado com sucesso!');
+      showAlert({
+        type: 'success',
+        title: 'Sucesso!',
+        message: 'Perfil atualizado com sucesso!'
+      });
     } catch (error) {
       console.error('Erro ao salvar perfil:', error);
-      alert('Erro ao salvar perfil');
+      showAlert({
+        type: 'error',
+        title: 'Erro',
+        message: 'Erro ao salvar perfil'
+      });
     } finally {
       setLoading(false);
     }
@@ -170,7 +180,11 @@ export default function SettingsPage() {
 
   const handleAddAccount = async () => {
     if (!user || !newAccount.nickname || !newAccount.institution) {
-      alert('Preencha todos os campos obrigatórios');
+      showAlert({
+        type: 'warning',
+        title: 'Campos obrigatórios',
+        message: 'Preencha todos os campos obrigatórios'
+      });
       return;
     }
 
@@ -197,7 +211,11 @@ export default function SettingsPage() {
       loadAccounts();
     } catch (error) {
       console.error('Erro ao adicionar conta:', error);
-      alert('Erro ao adicionar conta');
+      showAlert({
+        type: 'error',
+        title: 'Erro',
+        message: 'Erro ao adicionar conta'
+      });
     }
   };
 
@@ -233,8 +251,7 @@ export default function SettingsPage() {
       if (alertConfig.budget_limit) {
         alertsToCreate.push({
           user_id: user.id,
-          alert_type: 'spending_limit',
-          alert_title: 'Limite de Orçamento',
+          alert_type: 'envelope_limit', // Corrigido para enum válido
           message: 'Você está se aproximando do limite do seu orçamento',
           is_active: true
         });
@@ -242,8 +259,7 @@ export default function SettingsPage() {
       if (alertConfig.bill_reminder) {
         alertsToCreate.push({
           user_id: user.id,
-          alert_type: 'bill_reminder',
-          alert_title: 'Lembrete de Conta',
+          alert_type: 'due_date', // Corrigido para enum válido
           message: 'Você tem contas próximas do vencimento',
           is_active: true
         });
@@ -251,8 +267,7 @@ export default function SettingsPage() {
       if (alertConfig.unusual_spending) {
         alertsToCreate.push({
           user_id: user.id,
-          alert_type: 'unusual_spending',
-          alert_title: 'Gasto Incomum',
+          alert_type: 'impulse_check', // Corrigido para enum válido (ou free_balance/habit_streak)
           message: 'Detectamos um gasto incomum no seu padrão',
           is_active: true
         });
@@ -260,8 +275,7 @@ export default function SettingsPage() {
       if (alertConfig.savings_opportunity) {
         alertsToCreate.push({
           user_id: user.id,
-          alert_type: 'savings_opportunity',
-          alert_title: 'Oportunidade de Economia',
+          alert_type: 'free_balance', // Corrigido para enum válido
           message: 'Você pode economizar em algumas categorias',
           is_active: true
         });
@@ -271,10 +285,18 @@ export default function SettingsPage() {
         await supabase.from('alerts').insert(alertsToCreate);
       }
 
-      alert('Configurações de alertas salvas!');
+      showAlert({
+        type: 'success',
+        title: 'Sucesso!',
+        message: 'Configurações de alertas salvas!'
+      });
     } catch (error) {
       console.error('Erro ao salvar alertas:', error);
-      alert('Erro ao salvar configurações');
+      showAlert({
+        type: 'error',
+        title: 'Erro',
+        message: 'Erro ao salvar configurações'
+      });
     } finally {
       setLoading(false);
     }
@@ -853,6 +875,9 @@ export default function SettingsPage() {
           </Card>
         </div>
       )}
+
+      {/* Alert Modal */}
+      <AlertComponent />
     </div>
   );
 }

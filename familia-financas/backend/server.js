@@ -5,6 +5,7 @@ const pdfParse = require('pdf-parse');
 const { parse } = require('csv-parse/sync');
 const xlsx = require('xlsx');
 const { createClient } = require('@supabase/supabase-js');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 const PORT = process.env.PORT || 3000;
 
 // Inicializar cliente Supabase
@@ -14,6 +15,34 @@ const supabaseUrl = process.env.SUPABASE_URL;
 // ATENÇÃO: SERVICE_ROLE_KEY é obrigatória para operação segura do backend
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 let supabase = null;
+
+// Helper para limpeza de descrição
+function cleanDescription(desc) {
+  if (!desc) return '';
+  let clean = desc.trim();
+  const original = clean;
+  
+  // Remove espaços múltiplos e tabs
+  clean = clean.replace(/\s+/g, ' ').replace(/[|\t]/g, ' ');
+  
+  // Remove data no início (ex: "05-11-2025Transferência" -> "Transferência")
+  clean = clean.replace(/^\d{2}[-/]\d{2}[-/]\d{4}\s*/, '');
+  
+  // Remove valor/saldo/moeda no final
+  // Ex: "Apple-1.273,33 EUR" -> "Apple"
+  // Regex: Separador opcional (hífen/espaço), Valor monetário, Moeda opcional, Fim da linha
+  const balanceRegex = /[\s-]*(-?\d{1,3}(?:[.,]\d{3})*[.,]\d{2})\s*(?:EUR|€|R\$|\$|USD)?$/i;
+  clean = clean.replace(balanceRegex, '');
+  
+  // Remove lixo de moeda solta no meio
+  clean = clean.replace(/(?:EUR|€|R\$|\$|USD)\d+[.,]\d+(?:EUR|€|R\$|\$|USD)?/g, '');
+  
+  const final = clean.trim();
+  if (original !== final && original.length > 15) {
+     console.log(`[CLEAN] '${original}' -> '${final}'`); 
+  }
+  return final;
+}
 
 if (supabaseUrl && supabaseServiceKey) {
   // Verificar se é Service Role Key (começa com 'eyJ' e é mais longa)
@@ -720,8 +749,127 @@ function parseTransactionsFromExcel(excelBuffer, userId, accountId, tenantId) {
   }
 }
 
+// Função para parsear com Gemini (AI)
+async function parseTransactionsWithGemini(text) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.log('[AI] ⚠️ GEMINI_API_KEY não configurada. Pulando parse com AI.');
+    return [];
+  }
+
+  try {
+    console.log('[AI] 🤖 Iniciando análise com Gemini 2.0 Flash...');
+    const genAI = new GoogleGenerativeAI(apiKey);
+    // Usando gemini-2.0-flash que está disponível na conta
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+    const prompt = `
+      Você é um especialista em extração de dados bancários. Analise o texto abaixo de um extrato bancário e extraia TODAS as transações financeiras.
+      
+      TEXTO DO EXTRATO:
+      """
+      ${text.substring(0, 30000)} 
+      """
+      
+      INSTRUÇÕES:
+      1. Identifique cada transação com: Data, Descrição, Valor e Nome do Estabelecimento (Merchant).
+      2. Ignore saldos parciais, cabeçalhos e rodapés.
+      3. Para o valor: 
+         - Se for saída/débito, deve ser negativo (ex: -10.50).
+         - Se for entrada/crédito, deve ser positivo (ex: 1500.00).
+         - Use ponto como separador decimal.
+      4. Converta a data para o formato ISO YYYY-MM-DD.
+      5. Retorne APENAS um array JSON válido, sem markdown, sem explicações.
+      
+      Exemplo de formato de saída:
+      [
+        { "transaction_date": "2025-11-28", "description": "COMPRA SUPERMERCADO", "amount": -50.25, "merchant": "SUPERMERCADO" },
+        { "transaction_date": "2025-11-27", "description": "SALARIO MENSAL", "amount": 2500.00, "merchant": "EMPRESA XYZ" }
+      ]
+    `;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const textResponse = response.text();
+
+    console.log('[AI] 📝 Resposta Bruta do Gemini:', textResponse.substring(0, 500) + '...');
+    
+    // Tenta extrair JSON array do texto (busca por [ ... ])
+    let jsonString = textResponse;
+    const jsonMatch = textResponse.match(/\[[\s\S]*\]/);
+    
+    if (jsonMatch) {
+      jsonString = jsonMatch[0];
+    } else {
+      // Fallback: tenta limpar markdown
+      jsonString = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    }
+    
+    let transactions;
+    try {
+      transactions = JSON.parse(jsonString);
+    } catch (jsonError) {
+      console.error('[AI] ❌ Erro ao parsear JSON:', jsonError.message);
+      console.log('[AI] 📄 JSON tentado:', jsonString.substring(0, 200));
+      return [];
+    }
+    
+    if (!Array.isArray(transactions)) {
+      console.error('[AI] ❌ Resposta da AI não é um array:', textResponse.substring(0, 100));
+      return [];
+    }
+
+    console.log(`[AI] ✅ Gemini encontrou ${transactions.length} transações!`);
+    
+    return transactions.map(t => ({
+      transaction_date: t.transaction_date,
+      amount: parseFloat(t.amount),
+      description: t.description,
+      merchant: t.merchant || extractMerchant(t.description),
+      transaction_type: t.amount > 0 ? 'receita' : 'despesa',
+      status: 'confirmed',
+      source: 'pdf_import' // Mantendo compatibilidade com constraint do banco
+    }));
+
+  } catch (error) {
+    console.error('[AI] ❌ Erro ao processar com Gemini:', error.message);
+    return [];
+  }
+}
+
 // Função para extrair transações do texto do PDF
-function parseTransactionsFromText(text, userId, accountId, tenantId) {
+async function parseTransactionsFromText(text, userId, accountId, tenantId) {
+  // ==================================================================================
+  // 🤖 ESTRATÉGIA "AI FIRST": Tentar parsear com Gemini AI primeiro
+  // ==================================================================================
+  console.log('[PARSE] 🤖 Iniciando parsing via Gemini AI (Prioridade Alta)...');
+  try {
+    const aiTransactions = await parseTransactionsWithGemini(text);
+    
+    if (aiTransactions && aiTransactions.length > 0) {
+      console.log(`[PARSE] 🤖 Gemini VENCEU! Encontrou ${aiTransactions.length} transações com inteligência.`);
+      console.log('[PARSE] 🔍 Exemplo de transação AI:', JSON.stringify(aiTransactions[0]));
+      
+      // Retorna imediatamente se a IA funcionou
+      return aiTransactions.map(t => ({
+        ...t,
+        user_id: userId,
+        account_id: accountId,
+        tenant_id: tenantId
+      }));
+    } else {
+      console.log('[PARSE] ⚠️ Gemini retornou 0 transações ou falhou na validação. Iniciando fallback para Regex...');
+    }
+  } catch (error) {
+    console.error('[PARSE] ❌ Erro ao executar Gemini AI First:', error.message);
+    console.log('[PARSE] 🔄 Iniciando fallback para Regex Tradicional...');
+  }
+
+  // ==================================================================================
+  // 🔄 ESTRATÉGIA "FALLBACK": Regex tradicional (apenas se AI falhar)
+  // ==================================================================================
+  console.log('[PARSE] 🔄 Executando parsing via Regex (Modo Fallback)...');
+
   const transactions = [];
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
@@ -754,6 +902,12 @@ function parseTransactionsFromText(text, userId, accountId, tenantId) {
       name: 'Formato Tabela',
       // Data | Descrição | Valor
       regex: /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s*[|\t]\s*(.+?)\s*[|\t]\s*([\+\-]?\s*\d{1,10}(?:[.,]\d{3})*[.,]\d{2})/gi
+    },
+    {
+      name: 'Formato CSV Santander (Fallback)',
+      // Data,Data,Descrição,Valor,Saldo (ex: 28-11-2025,28-11-2025,Auchan,-2.29,-990.57)
+      // Captura: 1=Data, 3=Descrição, 4=Valor
+      regex: /(\d{2}-\d{2}-\d{4}),(?:\d{2}-\d{2}-\d{4}),(.+?),(-?\d+\.\d+)(?:,|$)/gi
     }
   ];
 
@@ -957,6 +1111,11 @@ function parseTransactionsFromText(text, userId, accountId, tenantId) {
           dateStr = match[1];
           description = match[3];
           amountStr = match[4];
+        } else if (pattern.name.includes('CSV')) {
+          // Formato CSV Santander: Data, (ignored), Descrição, Valor
+          dateStr = match[1];
+          description = match[2]; // Mudou índice por causa do (?:...)
+          amountStr = match[3];   // Mudou índice
         } else {
           // Formato simples
           dateStr = match[1];
@@ -988,13 +1147,8 @@ function parseTransactionsFromText(text, userId, accountId, tenantId) {
           amount = -amountValue;
         }
 
-        // Limpa descrição
-        description = description
-          .trim()
-          .replace(/\s+/g, ' ')
-          .replace(/[|\t]/g, ' ')
-          .replace(/(?:EUR|€|R\$|\$|USD)\d+[.,]\d+(?:EUR|€|R\$|\$|USD)?/g, '')
-          .trim();
+        // Limpa descrição usando helper robusto
+        description = cleanDescription(description);
 
         // Validações
         if (description.length < 3 || description.length > 500) {
@@ -1034,7 +1188,7 @@ function parseTransactionsFromText(text, userId, accountId, tenantId) {
             merchant: extractMerchant(description),
             transaction_type: amount > 0 ? 'receita' : 'despesa',
             status: 'confirmed',
-            source: 'pdf_import'
+            source: 'pdf_import' // Mantendo compatibilidade com constraint do banco
           });
         }
       } catch (error) {
@@ -1122,13 +1276,11 @@ function parseTransactionsFromText(text, userId, accountId, tenantId) {
         }
       }
 
-      description = description
-        .replace(/\s+/g, ' ')
-        .replace(/[|\t]/g, ' ')
-        .replace(/(?:EUR|€|R\$|\$|USD)\d+[.,]\d+(?:EUR|€|R\$|\$|USD)?/g, '')
-        .trim();
+      // Limpa descrição usando helper robusto
+      description = cleanDescription(description);
 
       if (!amount || isNaN(amount) || Math.abs(amount) < 0.01) continue;
+        
       if (description.length < 3 || description.length > 500) continue;
       if (/^[\d\s\.\,\-\/\+€\$£EURR\$USD]+$/.test(description)) continue;
 
@@ -1152,13 +1304,14 @@ function parseTransactionsFromText(text, userId, accountId, tenantId) {
           merchant: extractMerchant(description),
           transaction_type: amount > 0 ? 'receita' : 'despesa',
           status: 'confirmed',
-          source: 'pdf_import'
+          source: 'pdf_import' // Mantendo compatibilidade com constraint do banco
         });
       }
     }
   }
 
-  console.log(`[PARSE] ✅ Total de ${transactions.length} transações parseadas`);
+  console.log(`[PARSE] ✅ Total de ${transactions.length} transações parseadas via Regex`);
+  
   return transactions;
 }
 
@@ -1169,7 +1322,10 @@ async function checkDuplicatesInDB(transactions, userId) {
   try {
     console.log(`[DB] 🔍 Verificando duplicatas no banco para ${transactions.length} transações...`);
     
-    // Buscar transações existentes do usuário no mesmo período
+    // Pegar o account_id da primeira transação (assumindo que todas são para a mesma conta no lote)
+    const accountId = transactions[0].account_id;
+
+    // Buscar transações existentes do usuário no mesmo período e MESMA CONTA
     const dates = transactions.map(t => t.transaction_date);
     const minDate = dates.reduce((a, b) => a < b ? a : b);
     const maxDate = dates.reduce((a, b) => a > b ? a : b);
@@ -1178,6 +1334,7 @@ async function checkDuplicatesInDB(transactions, userId) {
       .from('transactions')
       .select('transaction_date, description, amount')
       .eq('user_id', userId)
+      .eq('account_id', accountId) // Filtrar também pela conta!
       .gte('transaction_date', minDate)
       .lte('transaction_date', maxDate);
     
@@ -1406,6 +1563,7 @@ const server = http.createServer(async (req, res) => {
   const timestamp = new Date().toISOString();
   // Log apenas método e URL para evitar vazar dados sensíveis em query params (embora não devamos usar query params sensíveis)
   console.log(`[${timestamp}] ${req.method} ${req.url.split('?')[0]}`);
+  console.log(`[VERSION] v1.1.0 - CSV Parser Fix Deploy`);
 
   // CORS Configuration
   // Permite configurar origens permitidas via variável de ambiente (separadas por vírgula)
@@ -1449,7 +1607,7 @@ const server = http.createServer(async (req, res) => {
 
   if (allowOrigin) {
     res.setHeader('Access-Control-Allow-Origin', allowOrigin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, apikey, x-client-info');
     res.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight 24h
   }
@@ -1690,11 +1848,13 @@ const server = http.createServer(async (req, res) => {
         const pdfData = await pdfParse(fileBuffer);
         const text = pdfData.text;
         console.log(`[${timestamp}] 📖 PDF parseado: ${pdfData.numpages} páginas, ${text.length} caracteres`);
-        transactions = parseTransactionsFromText(text, userId, accountId, tenantId);
+        transactions = await parseTransactionsFromText(text, userId, accountId, tenantId);
         fileInfo = { pdfPages: pdfData.numpages, fileType: 'pdf' };
       } else if (isCSV) {
-        console.log(`[${timestamp}] 📊 Processando como CSV...`);
-        transactions = parseTransactionsFromCSV(fileBuffer, userId, accountId, tenantId);
+        console.log(`[${timestamp}] 📊 Processando como CSV (via Gemini AI First)...`);
+        // Converte buffer para texto e usa a função inteligente com Gemini
+        const csvText = fileBuffer.toString('utf-8');
+        transactions = await parseTransactionsFromText(csvText, userId, accountId, tenantId);
         fileInfo = { fileType: 'csv' };
       } else if (isXLS) {
         console.log(`[${timestamp}] 📊 Processando como Excel...`);

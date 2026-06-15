@@ -18,6 +18,7 @@ build/
 # IDE
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
 *~
@@ -43,4 +44,7 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+
+# PDFs de exemplo/teste (podem conter dados sensíveis)
+docs/*.pdf
 

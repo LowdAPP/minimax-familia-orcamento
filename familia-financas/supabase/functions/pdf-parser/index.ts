@@ -469,6 +469,14 @@ function parseTransactionsFromText(text: string): { transactions: any[], bankFor
       amountGroup: 3
     },
     {
+      name: 'Formato CSV/Exportação',
+      // Data,Data,Descrição,Valor (ex: 24-11-2025,24-11-2025,Lidl Montijo,-67.77)
+      regex: /(\d{2}-\d{2}-\d{4}),(\d{2}-\d{2}-\d{4}),(.+?),([\+\-]?\d+(?:\.\d+)?)/gi,
+      dateGroup: 1,
+      descGroup: 3,
+      amountGroup: 4
+    },
+    {
       name: 'Formato Extrato Empresa - Múltiplas Colunas',
       // Data Descrição Valor (formato mais flexível)
       regex: /(\d{1,2}[\-\/]\d{1,2}[\-\/]\d{2,4})\s+([A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9\s\.\-\/\(\)]{3,100}?)\s+([\-\+]?\d{1,10}(?:[.,]\d{3})*[.,]\d{2})\s*(?:EUR|€|R\$|\$|USD)?/gi,

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useI18n } from '../hooks/useI18n';
 import { supabase } from '../lib/supabase';
+import { useAlert } from '../hooks/useAlert';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -171,6 +172,7 @@ const COLORS = [
 export default function CategoriesPage() {
   const { user } = useAuth();
   const { t, formatCurrency } = useI18n();
+  const { showAlert, AlertComponent } = useAlert();
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -262,7 +264,11 @@ export default function CategoriesPage() {
 
   const handleEdit = (category: Category) => {
     if (category.is_system_category) {
-      alert('Categorias do sistema não podem ser editadas');
+      showAlert({
+        type: 'warning',
+        title: 'Ação não permitida',
+        message: 'Categorias do sistema não podem ser editadas'
+      });
       return;
     }
     setFormData({
@@ -278,7 +284,11 @@ export default function CategoriesPage() {
 
   const handleSave = async () => {
     if (!user || !formData.name.trim()) {
-      alert('Preencha o nome da categoria');
+      showAlert({
+        type: 'warning',
+        title: 'Campo obrigatório',
+        message: 'Preencha o nome da categoria'
+      });
       return;
     }
 
@@ -326,7 +336,11 @@ export default function CategoriesPage() {
       setDbError(null);
     } catch (error: any) {
       console.error('Erro ao salvar categoria:', error);
-      alert(error.message || 'Erro ao salvar categoria. Verifique a conexão com o banco de dados.');
+      showAlert({
+        type: 'error',
+        title: 'Erro ao salvar',
+        message: error.message || 'Erro ao salvar categoria. Verifique a conexão com o banco de dados.'
+      });
     } finally {
       setSaving(false);
     }
@@ -334,7 +348,11 @@ export default function CategoriesPage() {
 
   const handleDelete = async (category: Category) => {
     if (category.is_system_category) {
-      alert('Categorias do sistema não podem ser deletadas');
+      showAlert({
+        type: 'warning',
+        title: 'Ação não permitida',
+        message: 'Categorias do sistema não podem ser deletadas'
+      });
       return;
     }
 
@@ -352,7 +370,11 @@ export default function CategoriesPage() {
         .limit(1);
 
       if (transactions && transactions.length > 0) {
-        alert('Não é possível deletar esta categoria pois existem transações associadas a ela.');
+        showAlert({
+          type: 'warning',
+          title: 'Não é possível deletar',
+          message: 'Não é possível deletar esta categoria pois existem transações associadas a ela.'
+        });
         return;
       }
 
@@ -365,7 +387,11 @@ export default function CategoriesPage() {
       await loadCategories();
     } catch (error: any) {
       console.error('Erro ao deletar categoria:', error);
-      alert(`Erro ao deletar categoria: ${error.message}`);
+      showAlert({
+        type: 'error',
+        title: 'Erro ao deletar',
+        message: `Erro ao deletar categoria: ${error.message}`
+      });
     } finally {
       setDeleting(null);
     }
@@ -704,6 +730,9 @@ export default function CategoriesPage() {
           </Card>
         </div>
       )}
+
+      {/* Alert Modal */}
+      <AlertComponent />
     </div>
   );
 }
