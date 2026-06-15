@@ -62,7 +62,7 @@ export default function WeeklyReviewPage() {
         .reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
       const weekSpent = txs
         .filter((t: any) => t.transaction_type === 'despesa')
-        .reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+        .reduce((s: number, t: any) => s + Math.abs(Number(t.amount || 0)), 0);
       setIncome(weekIncome);
       setSpent(weekSpent);
 
@@ -89,7 +89,7 @@ export default function WeeklyReviewPage() {
           const catSpent = sumInRange(
             txs
               .filter((t: any) => t.category_id === (it as any).category_id && t.transaction_type === 'despesa')
-              .map((t: any) => ({ transaction_date: t.transaction_date, amount: Number(t.amount || 0) })),
+              .map((t: any) => ({ transaction_date: t.transaction_date, amount: Math.abs(Number(t.amount || 0)) })),
             startISO,
             endISO
           );

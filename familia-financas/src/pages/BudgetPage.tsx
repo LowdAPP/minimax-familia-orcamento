@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useI18n } from '../hooks/useI18n';
 import { supabase } from '../lib/supabase';
+import { monthRange, sumAbsByCategory } from '../lib/finance/cashflow';
 import { useAlert } from '../hooks/useAlert';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -14,7 +15,9 @@ import {
   AlertCircle,
   Check,
   Edit,
-  Save
+  Save,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { PieChart as RechartsPie, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
@@ -54,6 +57,24 @@ export default function BudgetPage() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   
+  const [selectedMonth, setSelectedMonth] = useState<string>(() =>
+    new Date().toISOString().slice(0, 7)
+  );
+
+  const shiftMonth = (delta: number) => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const monthLabel = (() => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString(
+      language === 'pt-PT' ? 'pt-PT' : 'pt-BR',
+      { month: 'long', year: 'numeric' }
+    );
+  })();
+  
   const [budget, setBudget] = useState<Budget>({
     budget_name: 'Orçamento Atual',
     methodology: '50_30_20',
@@ -65,20 +86,22 @@ export default function BudgetPage() {
 
   const [categoryBudgets, setCategoryBudgets] = useState<CategoryBudget[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [spentByCategory, setSpentByCategory] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (user) {
       loadData();
     }
-  }, [user, activeTab]);
+  }, [user, activeTab, selectedMonth]);
 
   const loadData = async () => {
     setLoading(true);
     try {
+      const budgetId = await loadBudget();
       await Promise.all([
-        loadBudget(),
         loadCategories(),
-        loadCategoryBudgets()
+        loadSpent(),
+        budgetId ? loadCategoryBudgets(budgetId) : Promise.resolve(),
       ]);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -87,11 +110,11 @@ export default function BudgetPage() {
     }
   };
 
-  const loadBudget = async () => {
-    if (!user) return;
+  const loadBudget = async (): Promise<string | undefined> => {
+    if (!user) return undefined;
 
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    
+    const currentMonth = selectedMonth;
+
     const { data } = await supabase
       .from('budgets')
       .select('*')
@@ -102,9 +125,11 @@ export default function BudgetPage() {
 
     if (data) {
       setBudget(data);
+      return data.id;
     } else {
       // Calcular orçamento baseado na metodologia
       await calculateBudget();
+      return undefined;
     }
   };
 
@@ -118,8 +143,8 @@ export default function BudgetPage() {
     setCategories(data || []);
   };
 
-  const loadCategoryBudgets = async () => {
-    if (!user || !budget.id) return;
+  const loadCategoryBudgets = async (budgetId: string) => {
+    if (!user || !budgetId) return;
 
     const { data } = await supabase
       .from('budget_items')
@@ -129,7 +154,7 @@ export default function BudgetPage() {
         spent_amount,
         categories (name, category_type)
       `)
-      .eq('budget_id', budget.id);
+      .eq('budget_id', budgetId);
 
     setCategoryBudgets(
       data?.map((item: any) => ({
@@ -140,6 +165,41 @@ export default function BudgetPage() {
         category_type: item.categories.category_type
       })) || []
     );
+  };
+
+  const loadSpent = async () => {
+    if (!user) return;
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const { startISO, endISO } = monthRange(y, m);
+    const { data } = await supabase
+      .from('transactions')
+      .select('amount, category_id')
+      .eq('user_id', user.id)
+      .eq('transaction_type', 'despesa')
+      .gte('transaction_date', startISO)
+      .lte('transaction_date', endISO);
+    setSpentByCategory(sumAbsByCategory((data || []) as any));
+  };
+
+  const setAllocated = (categoryId: string, value: number, categoryType: CategoryBudget['category_type']) => {
+    setCategoryBudgets((prev) => {
+      const exists = prev.find((cb) => cb.category_id === categoryId);
+      if (exists) {
+        return prev.map((cb) =>
+          cb.category_id === categoryId ? { ...cb, allocated_amount: value } : cb
+        );
+      }
+      return [
+        ...prev,
+        {
+          category_id: categoryId,
+          category_name: '',
+          allocated_amount: value,
+          spent_amount: 0,
+          category_type: categoryType,
+        },
+      ];
+    });
   };
 
   const calculateBudget = async () => {
@@ -195,7 +255,7 @@ export default function BudgetPage() {
 
     setSaving(true);
     try {
-      const currentMonth = new Date().toISOString().slice(0, 7);
+      const currentMonth = selectedMonth;
       
       const budgetData = {
         user_id: user.id,
@@ -242,9 +302,12 @@ export default function BudgetPage() {
         result = data;
       }
 
+      await persistBudgetItems(result.id);
+
       setBudget({ ...budget, id: result.id });
       setEditing(false);
-      
+      await loadData();
+
       showAlert({
         type: 'success',
         title: 'Sucesso!',
@@ -263,7 +326,34 @@ export default function BudgetPage() {
     }
   };
 
-
+  const persistBudgetItems = async (budgetId: string) => {
+    for (const cb of categoryBudgets) {
+      if (cb.allocated_amount == null) continue;
+      const { data: existing } = await supabase
+        .from('budget_items')
+        .select('id')
+        .eq('budget_id', budgetId)
+        .eq('category_id', cb.category_id)
+        .maybeSingle();
+      if (existing?.id) {
+        const { error } = await supabase
+          .from('budget_items')
+          .update({ allocated_amount: cb.allocated_amount })
+          .eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('budget_items')
+          .insert({
+            budget_id: budgetId,
+            category_id: cb.category_id,
+            allocated_amount: cb.allocated_amount,
+            spent_amount: 0,
+          });
+        if (error) throw error;
+      }
+    }
+  };
 
   const getProgressPercentage = (spent: number, allocated: number) => {
     if (allocated === 0) return 0;
@@ -275,6 +365,15 @@ export default function BudgetPage() {
     if (percentage >= 80) return 'bg-warning-500';
     return 'bg-success-500';
   };
+
+  const spentForTypes = (types: string[]) =>
+    categories
+      .filter((c: any) => types.includes(c.category_type))
+      .reduce((s: number, c: any) => s + (spentByCategory[c.id] || 0), 0);
+
+  const needsSpent = spentForTypes(['essencial', 'divida']);
+  const wantsSpent = spentForTypes(['superfluo']);
+  const savingsSpent = spentForTypes(['poupanca']);
 
   // Dados para gráfico 50/30/20
   const fiftyThirtyTwentyData = [
@@ -300,6 +399,25 @@ export default function BudgetPage() {
           <p className="text-body text-neutral-600 mt-xs">
             Gerencie seu orçamento com diferentes metodologias
           </p>
+          <div className="flex items-center gap-sm mt-sm">
+            <button
+              onClick={() => shiftMonth(-1)}
+              className="p-xs text-neutral-600 hover:text-primary-500 hover:bg-neutral-100 rounded-base"
+              title="Mês anterior"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-body font-semibold text-neutral-900 capitalize min-w-[140px] text-center">
+              {monthLabel}
+            </span>
+            <button
+              onClick={() => shiftMonth(1)}
+              className="p-xs text-neutral-600 hover:text-primary-500 hover:bg-neutral-100 rounded-base"
+              title="Próximo mês"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
         </div>
         <div className="flex gap-sm">
           {editing ? (
@@ -421,6 +539,9 @@ export default function BudgetPage() {
                   <p className="text-h4 font-bold text-blue-900">
                     {formatCurrency(budget.total_income * 0.5)}
                   </p>
+                  <p className="text-small text-blue-700 mt-xs font-semibold">
+                    Gasto real: {formatCurrency(needsSpent)}
+                  </p>
                   <p className="text-small text-blue-600 mt-xs">
                     Moradia, alimentação, transporte, saúde
                   </p>
@@ -431,6 +552,9 @@ export default function BudgetPage() {
                   <p className="text-h4 font-bold text-orange-900">
                     {formatCurrency(budget.total_income * 0.3)}
                   </p>
+                  <p className="text-small text-orange-700 mt-xs font-semibold">
+                    Gasto real: {formatCurrency(wantsSpent)}
+                  </p>
                   <p className="text-small text-orange-600 mt-xs">
                     Lazer, restaurantes, compras não essenciais
                   </p>
@@ -440,6 +564,9 @@ export default function BudgetPage() {
                   <p className="text-small text-green-700 font-semibold mb-xs">Poupança (20%)</p>
                   <p className="text-h4 font-bold text-green-900">
                     {formatCurrency(budget.total_income * 0.2)}
+                  </p>
+                  <p className="text-small text-green-700 mt-xs font-semibold">
+                    Gasto real: {formatCurrency(savingsSpent)}
                   </p>
                   <p className="text-small text-green-600 mt-xs">
                     Reserva de emergência, investimentos, aposentadoria
@@ -495,7 +622,8 @@ export default function BudgetPage() {
                 categories.map((category) => {
                   const categoryBudget = categoryBudgets.find(cb => cb.category_id === category.id);
                   const allocated = categoryBudget?.allocated_amount || 0;
-                  const spent = categoryBudget?.spent_amount || 0;
+                  const spent = spentByCategory[category.id] || 0;
+                  const remaining = allocated - spent;
                   const percentage = getProgressPercentage(spent, allocated);
 
                   return (
@@ -505,6 +633,11 @@ export default function BudgetPage() {
                           <p className="text-body font-semibold text-neutral-900">{category.name}</p>
                           <p className="text-small text-neutral-600">
                             Gasto: {formatCurrency(spent)} de {formatCurrency(allocated)}
+                            {allocated > 0 && (
+                              <span className={remaining < 0 ? 'text-error-600 font-semibold' : 'text-success-600'}>
+                                {' · '}Resta {formatCurrency(remaining)}
+                              </span>
+                            )}
                           </p>
                         </div>
                         <div className="w-32">
@@ -512,6 +645,9 @@ export default function BudgetPage() {
                             type="number"
                             placeholder="0,00"
                             value={allocated || ''}
+                            onChange={(e) =>
+                              setAllocated(category.id, parseFloat(e.target.value) || 0, category.category_type)
+                            }
                             disabled={!editing}
                             step="0.01"
                             className="text-right"
@@ -611,6 +747,10 @@ export default function BudgetPage() {
                     <Input
                       type="number"
                       placeholder="0,00"
+                      value={(categoryBudgets.find(cb => cb.category_id === category.id)?.allocated_amount) || ''}
+                      onChange={(e) =>
+                        setAllocated(category.id, parseFloat(e.target.value) || 0, category.category_type)
+                      }
                       disabled={!editing}
                       step="0.01"
                       className="text-right"

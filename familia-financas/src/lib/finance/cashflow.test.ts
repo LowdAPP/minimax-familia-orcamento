@@ -10,6 +10,8 @@ import {
   weekRange,
   daysRemaining,
   sumInRange,
+  monthRange,
+  sumAbsByCategory,
 } from './cashflow';
 
 const bills = [
@@ -105,5 +107,43 @@ describe('sumInRange', () => {
       { transaction_date: '2026-06-22', amount: 50 },
     ];
     expect(sumInRange(items, '2026-06-15', '2026-06-21')).toBe(95);
+  });
+});
+
+describe('monthRange', () => {
+  it('junho/2026 vai de 01 a 30', () => {
+    expect(monthRange(2026, 6)).toEqual({ startISO: '2026-06-01', endISO: '2026-06-30' });
+  });
+  it('fevereiro/2026 vai de 01 a 28', () => {
+    expect(monthRange(2026, 2)).toEqual({ startISO: '2026-02-01', endISO: '2026-02-28' });
+  });
+  it('fevereiro/2024 (bissexto) vai até 29', () => {
+    expect(monthRange(2024, 2)).toEqual({ startISO: '2024-02-01', endISO: '2024-02-29' });
+  });
+});
+
+describe('sumAbsByCategory', () => {
+  it('soma valor absoluto agrupado por category_id', () => {
+    const items = [
+      { category_id: 'a', amount: -87 },
+      { category_id: 'a', amount: -13 },
+      { category_id: 'b', amount: -40 },
+    ];
+    expect(sumAbsByCategory(items)).toEqual({ a: 100, b: 40 });
+  });
+  it('trata valores positivos e negativos pelo módulo', () => {
+    const items = [
+      { category_id: 'a', amount: -50 },
+      { category_id: 'a', amount: 50 },
+    ];
+    expect(sumAbsByCategory(items)).toEqual({ a: 100 });
+  });
+  it('ignora itens sem category_id', () => {
+    const items = [
+      { category_id: null, amount: -99 },
+      { category_id: undefined, amount: -1 },
+      { category_id: 'a', amount: -10 },
+    ];
+    expect(sumAbsByCategory(items)).toEqual({ a: 10 });
   });
 });
