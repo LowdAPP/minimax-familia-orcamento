@@ -6,7 +6,7 @@ import { supabase, FixedBill, FixedBillPayment } from '../lib/supabase';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Plus, Edit, Trash2, Save, X, CheckCircle, Circle, Sparkles } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, CheckCircle, Circle, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const RECOMMENDED = [
   { name: 'Renda', amount: 700, due_day: 5 },
@@ -20,8 +20,22 @@ function currentMonthYear(): string {
 
 export default function FixedBillsPage() {
   const { user } = useAuth();
-  const { formatCurrency } = useI18n();
-  const monthYear = currentMonthYear();
+  const { formatCurrency, language } = useI18n();
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => currentMonthYear());
+
+  const shiftMonth = (delta: number) => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const monthLabel = (() => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString(
+      language === 'pt-PT' ? 'pt-PT' : 'pt-BR',
+      { month: 'long', year: 'numeric' }
+    );
+  })();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -34,7 +48,7 @@ export default function FixedBillsPage() {
   useEffect(() => {
     if (user) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, selectedMonth]);
 
   const load = async () => {
     if (!user) return;
@@ -50,7 +64,7 @@ export default function FixedBillsPage() {
         .from('fixed_bill_payments')
         .select('*')
         .eq('user_id', user.id)
-        .eq('month_year', monthYear);
+        .eq('month_year', selectedMonth);
       setBills(billsData || []);
       setPayments(payData || []);
     } finally {
@@ -124,7 +138,7 @@ export default function FixedBillsPage() {
     const payload = {
       fixed_bill_id: bill.id,
       user_id: user.id,
-      month_year: monthYear,
+      month_year: selectedMonth,
       is_paid: nextPaid,
       paid_date: nextPaid ? new Date().toISOString().slice(0, 10) : null,
       amount_paid: nextPaid ? bill.amount : null,
@@ -171,6 +185,25 @@ export default function FixedBillsPage() {
           <p className="text-body text-neutral-600 mt-xs">
             Marque cada conta conforme paga. O que falta pagar é o seu "comprometido".
           </p>
+          <div className="flex items-center gap-sm mt-sm">
+            <button
+              onClick={() => shiftMonth(-1)}
+              className="p-xs text-neutral-600 hover:text-primary-500 hover:bg-neutral-100 rounded-base"
+              title="Mês anterior"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-body font-semibold text-neutral-900 capitalize min-w-[140px] text-center">
+              {monthLabel}
+            </span>
+            <button
+              onClick={() => shiftMonth(1)}
+              className="p-xs text-neutral-600 hover:text-primary-500 hover:bg-neutral-100 rounded-base"
+              title="Próximo mês"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
         </div>
         <Button variant="primary" onClick={openAdd}>
           <Plus className="w-4 h-4" />
