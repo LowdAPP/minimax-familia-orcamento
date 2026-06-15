@@ -97,11 +97,11 @@ export default function BudgetPage() {
   const loadData = async () => {
     setLoading(true);
     try {
+      const budgetId = await loadBudget();
       await Promise.all([
-        loadBudget(),
         loadCategories(),
-        loadCategoryBudgets(),
-        loadSpent()
+        loadSpent(),
+        budgetId ? loadCategoryBudgets(budgetId) : Promise.resolve(),
       ]);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -110,11 +110,11 @@ export default function BudgetPage() {
     }
   };
 
-  const loadBudget = async () => {
-    if (!user) return;
+  const loadBudget = async (): Promise<string | undefined> => {
+    if (!user) return undefined;
 
     const currentMonth = selectedMonth;
-    
+
     const { data } = await supabase
       .from('budgets')
       .select('*')
@@ -125,9 +125,11 @@ export default function BudgetPage() {
 
     if (data) {
       setBudget(data);
+      return data.id;
     } else {
       // Calcular orçamento baseado na metodologia
       await calculateBudget();
+      return undefined;
     }
   };
 
@@ -141,8 +143,8 @@ export default function BudgetPage() {
     setCategories(data || []);
   };
 
-  const loadCategoryBudgets = async () => {
-    if (!user || !budget.id) return;
+  const loadCategoryBudgets = async (budgetId: string) => {
+    if (!user || !budgetId) return;
 
     const { data } = await supabase
       .from('budget_items')
@@ -152,7 +154,7 @@ export default function BudgetPage() {
         spent_amount,
         categories (name, category_type)
       `)
-      .eq('budget_id', budget.id);
+      .eq('budget_id', budgetId);
 
     setCategoryBudgets(
       data?.map((item: any) => ({
