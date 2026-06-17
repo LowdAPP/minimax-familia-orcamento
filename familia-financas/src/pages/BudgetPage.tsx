@@ -95,7 +95,8 @@ export default function BudgetPage() {
   }, [user, activeTab, selectedMonth]);
 
   const loadData = async () => {
-    setLoading(true);
+    // Spinner de tela cheia só no carregamento inicial; refetches (aba/mês)
+    // atualizam no lugar, sem blanquear a página (evita flicker).
     try {
       const budgetId = await loadBudget();
       await Promise.all([

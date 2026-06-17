@@ -123,7 +123,8 @@ export default function GoalsPage() {
   };
 
   const loadData = async () => {
-    setLoading(true);
+    // Spinner de tela cheia só no carregamento inicial; refetches atualizam no
+    // lugar, sem blanquear a página (evita flicker).
     try {
       await Promise.all([loadGoals(), loadDebts()]);
     } catch (error) {

@@ -194,7 +194,8 @@ export default function TransactionsPage() {
   }, [user, filterMonth, filterType, filterAccount]);
 
   const loadData = async () => {
-    setLoading(true);
+    // Spinner de tela cheia só no carregamento inicial; refetches (filtros)
+    // atualizam no lugar, sem blanquear a página (evita flicker).
     try {
       // Carregar categorias e contas primeiro para garantir que estejam disponíveis
       await Promise.all([loadAccounts(), loadCategories()]);

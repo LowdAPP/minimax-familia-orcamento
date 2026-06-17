@@ -222,8 +222,9 @@ export default function CategoriesPage() {
 
   const loadCategories = async () => {
     if (!user) return;
-    
-    setLoading(true);
+
+    // Spinner de tela cheia só no carregamento inicial; refetches atualizam no
+    // lugar, sem blanquear a página (evita flicker).
     try {
       const { data, error } = await supabase
         .from('categories')

@@ -45,7 +45,8 @@ export default function WeeklyReviewPage() {
 
   const load = async () => {
     if (!user) return;
-    setLoading(true);
+    // Spinner de tela cheia só no carregamento inicial; refetches (semana)
+    // atualizam no lugar, sem blanquear a página (evita flicker).
     try {
       const { startISO, endISO } = weekRange(year, month, week);
 
