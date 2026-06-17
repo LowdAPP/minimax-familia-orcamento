@@ -48,3 +48,4 @@ coverage/
 # PDFs de exemplo/teste (podem conter dados sensíveis)
 docs/*.pdf
 
+.superpowers/
