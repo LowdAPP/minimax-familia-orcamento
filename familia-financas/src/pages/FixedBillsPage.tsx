@@ -52,7 +52,9 @@ export default function FixedBillsPage() {
 
   const load = async () => {
     if (!user) return;
-    setLoading(true);
+    // Não re-ativar o spinner de tela cheia em refetches (troca de mês, toggle,
+    // salvar/apagar). Só o carregamento inicial usa o gate `loading`; refetches
+    // atualizam os dados no lugar, sem blanquear a página (evita flicker).
     try {
       const { data: billsData } = await supabase
         .from('fixed_bills')
@@ -143,14 +145,20 @@ export default function FixedBillsPage() {
       paid_date: nextPaid ? new Date().toISOString().slice(0, 10) : null,
       amount_paid: nextPaid ? bill.amount : null,
     };
+    // Atualização otimista: reflete o novo estado na hora, sem recarregar a
+    // página. Em caso de erro, recarrega para reverter ao estado real.
+    setPayments((prev) => {
+      const others = prev.filter((p) => p.fixed_bill_id !== bill.id);
+      return [...others, { ...(existing ?? {}), ...payload } as FixedBillPayment];
+    });
+
     const { error } = await supabase
       .from('fixed_bill_payments')
       .upsert(payload, { onConflict: 'fixed_bill_id,month_year' });
     if (error) {
       alert(error.message || 'Erro ao atualizar pagamento');
-      return;
+      await load();
     }
-    await load();
   };
 
   const seedRecommended = async () => {
