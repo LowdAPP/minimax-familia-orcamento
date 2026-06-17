@@ -5,13 +5,16 @@ import { useAuth } from '../contexts/AuthContext';
 import { useI18n } from '../hooks/useI18n';
 import { supabase } from '../lib/supabase';
 import type { FixedBill, FixedBillPayment } from '../lib/supabase';
-import { committedAmount, availableAmount, daysRemaining } from '../lib/finance/cashflow';
+import { committedAmount, availableAmount, daysRemaining, monthRange, sumAbsByCategory } from '../lib/finance/cashflow';
 import { Card, StatCard } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { AvailableGauge } from '../components/dashboard/AvailableGauge';
+import { BudgetBuckets, type Bucket } from '../components/dashboard/BudgetBuckets';
+import { CategoryDonut } from '../components/dashboard/CategoryDonut';
+import { GoalsProgress, type GoalProgress } from '../components/dashboard/GoalsProgress';
 import {
   Wallet,
   TrendingUp,
-  TrendingDown,
   PiggyBank,
   Upload,
   Target,
@@ -21,10 +24,9 @@ import {
   Info,
   ArrowRight,
   Lock,
-  CalendarClock,
+  PieChart,
   X
 } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 interface DashboardStats {
   totalBalance: number;
@@ -77,6 +79,9 @@ export default function DashboardPage() {
     daysLeft: 0,
     savingsBalance: 0,
   });
+  const [buckets, setBuckets] = useState<Bucket[]>([]);
+  const [budgetIncome, setBudgetIncome] = useState(0);
+  const [goals, setGoals] = useState<GoalProgress[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -99,7 +104,9 @@ export default function DashboardPage() {
         loadCategoryExpenses(),
         loadRecentTransactions(),
         loadAlerts(),
-        loadCashflow()
+        loadCashflow(),
+        loadBudgetBuckets(),
+        loadGoals()
       ]);
     } catch (error) {
       console.error('Erro ao carregar dados do dashboard:', error);
@@ -150,6 +157,66 @@ export default function DashboardPage() {
       daysLeft: daysRemaining(year, month, day),
       savingsBalance,
     });
+  };
+
+  // Orçamento 50/30/20: gasto real por bucket (category_type) no mês atual.
+  const loadBudgetBuckets = async () => {
+    if (!user) return;
+    const now = new Date();
+    const { startISO, endISO } = monthRange(now.getFullYear(), now.getMonth() + 1);
+
+    const { data: categories } = await supabase
+      .from('categories')
+      .select('id, category_type')
+      .or(`user_id.eq.${user.id},is_system_category.eq.true`);
+
+    const { data: txns } = await supabase
+      .from('transactions')
+      .select('amount, category_id')
+      .eq('user_id', user.id)
+      .eq('transaction_type', 'despesa')
+      .gte('transaction_date', startISO)
+      .lte('transaction_date', endISO);
+
+    const spentByCategory = sumAbsByCategory((txns || []) as any);
+    const spentForTypes = (types: string[]) =>
+      (categories || [])
+        .filter((c: any) => types.includes(c.category_type))
+        .reduce((s: number, c: any) => s + (spentByCategory[c.id] || 0), 0);
+
+    setBuckets([
+      { label: 'Necessidades', spent: spentForTypes(['essencial', 'divida']), targetPct: 50 },
+      { label: 'Desejos', spent: spentForTypes(['superfluo']), targetPct: 30 },
+      { label: 'Poupança', spent: spentForTypes(['poupanca']), targetPct: 20 },
+    ]);
+
+    const income = Number(profile?.monthly_income) || 0;
+    setBudgetIncome(income);
+  };
+
+  // Metas de poupança: progresso current vs target.
+  const loadGoals = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('goals')
+      .select('id, goal_name, current_amount, target_amount, status')
+      .eq('user_id', user.id)
+      .neq('status', 'cancelled');
+
+    const mapped: GoalProgress[] = (data || []).map((g: any) => ({
+      id: g.id,
+      name: g.goal_name,
+      current: Number(g.current_amount) || 0,
+      target: Number(g.target_amount) || 0,
+    }));
+
+    // Ordena por % de progresso (desc) e mostra as 4 principais.
+    mapped.sort((a, b) => {
+      const pa = a.target > 0 ? a.current / a.target : 0;
+      const pb = b.target > 0 ? b.current / b.target : 0;
+      return pb - pa;
+    });
+    setGoals(mapped.slice(0, 4));
   };
 
   const loadStats = async () => {
@@ -546,8 +613,8 @@ export default function DashboardPage() {
           <h1 className="text-h2 font-bold text-neutral-900">
             Olá, {user?.email?.split('@')[0] || 'Usuário'}! 👋
           </h1>
-          <p className="text-body text-neutral-600 mt-xs">
-            Aqui está um resumo das suas finanças
+          <p className="text-body text-neutral-600 mt-xs capitalize">
+            Resumo de {new Date().toLocaleDateString('pt-BR', { month: 'long' })} · {cashflow.daysLeft} dias restantes
           </p>
         </div>
         <div className="flex gap-sm">
@@ -566,7 +633,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Cashflow Cards: Disponível / Comprometido / Dias restantes / Já poupado */}
+      {/* Stat Cards: Disponível / Comprometido / Receitas / Já poupado */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-md">
         <StatCard
           icon={<Wallet className="w-5 h-5" />}
@@ -579,43 +646,14 @@ export default function DashboardPage() {
           value={formatCurrency(cashflow.committed)}
         />
         <StatCard
-          icon={<CalendarClock className="w-5 h-5" />}
-          label="Dias restantes"
-          value={String(cashflow.daysLeft)}
-        />
-        <StatCard
-          icon={<PiggyBank className="w-5 h-5" />}
-          label="Já poupado"
-          value={formatCurrency(cashflow.savingsBalance)}
-        />
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-md">
-        <StatCard
-          icon={<Wallet className="w-5 h-5" />}
-          label={t('dashboard.totalBalance')}
-          value={formatCurrency(stats.totalBalance)}
-        />
-        <StatCard
           icon={<TrendingUp className="w-5 h-5" />}
           label={t('dashboard.monthlyIncome')}
           value={formatCurrency(stats.monthlyIncome)}
         />
         <StatCard
-          icon={<TrendingDown className="w-5 h-5" />}
-          label={t('dashboard.monthlyExpenses')}
-          value={formatCurrency(stats.monthlyExpenses)}
-        />
-        <StatCard
           icon={<PiggyBank className="w-5 h-5" />}
-          label={t('dashboard.savings')}
-          value={formatCurrency(stats.savings)}
-          change={
-            stats.savings > 0
-              ? { value: Math.round((stats.savings / stats.monthlyIncome) * 100), type: 'increase' }
-              : undefined
-          }
+          label="Já poupado"
+          value={formatCurrency(cashflow.savingsBalance)}
         />
       </div>
 
@@ -644,60 +682,20 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Main Content Grid */}
+      {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-lg">
-        {/* Despesas por Categoria */}
-        <Card>
-          <div className="mb-md">
-            <h3 className="text-h4 font-bold text-neutral-900">Despesas por Categoria</h3>
-            <p className="text-small text-neutral-600 mt-xs">Distribuição do mês atual</p>
-          </div>
+        <AvailableGauge
+          available={cashflow.available}
+          committed={cashflow.committed}
+          formatCurrency={formatCurrency}
+        />
+        <BudgetBuckets buckets={buckets} income={budgetIncome} formatCurrency={formatCurrency} />
+        <CategoryDonut data={categoryExpenses} formatCurrency={formatCurrency} />
+        <GoalsProgress goals={goals} formatCurrency={formatCurrency} />
+      </div>
 
-          {categoryExpenses.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              {/* @ts-ignore */}
-              <PieChart>
-                {/* @ts-ignore */}
-                <Pie
-                  data={categoryExpenses}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {categoryExpenses.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                {/* @ts-ignore */}
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-[300px] flex items-center justify-center text-neutral-500">
-              <div className="text-center">
-                <PieChart className="w-12 h-12 mx-auto mb-sm opacity-50" />
-                <p className="text-body">Nenhuma despesa registrada</p>
-                <p className="text-small mt-xs">Comece importando seus extratos</p>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-md pt-md border-t border-neutral-200">
-            <Link to="/budget">
-              <Button variant="outline" fullWidth>
-                Ver Orçamento Completo
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </Link>
-          </div>
-        </Card>
-
-        {/* Transações Recentes */}
-        <Card>
+      {/* Transações Recentes */}
+      <Card>
           <div className="mb-md">
             <h3 className="text-h4 font-bold text-neutral-900">Transações Recentes</h3>
             <p className="text-small text-neutral-600 mt-xs">Últimas movimentações</p>
@@ -760,7 +758,6 @@ export default function DashboardPage() {
             </Link>
           </div>
         </Card>
-      </div>
 
       {/* Quick Actions */}
       <Card>
