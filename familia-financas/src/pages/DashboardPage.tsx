@@ -8,7 +8,7 @@ import type { FixedBill, FixedBillPayment } from '../lib/supabase';
 import { committedAmount, availableAmount, daysRemaining, monthRange, sumAbsByCategory } from '../lib/finance/cashflow';
 import { Card, StatCard } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { AvailableGauge } from '../components/dashboard/AvailableGauge';
+import { FixedBillsProgress, type FixedBillItem } from '../components/dashboard/FixedBillsProgress';
 import { BudgetBuckets, type Bucket } from '../components/dashboard/BudgetBuckets';
 import { CategoryDonut } from '../components/dashboard/CategoryDonut';
 import { GoalsProgress, type GoalProgress } from '../components/dashboard/GoalsProgress';
@@ -82,6 +82,7 @@ export default function DashboardPage() {
   const [buckets, setBuckets] = useState<Bucket[]>([]);
   const [budgetIncome, setBudgetIncome] = useState(0);
   const [goals, setGoals] = useState<GoalProgress[]>([]);
+  const [fixedBills, setFixedBills] = useState<FixedBillItem[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -138,7 +139,7 @@ export default function DashboardPage() {
 
     const { data: billsData } = await supabase
       .from('fixed_bills')
-      .select('id, amount, is_active')
+      .select('id, name, amount, is_active')
       .eq('user_id', user.id)
       .eq('is_active', true);
     const { data: payData } = await supabase
@@ -150,6 +151,16 @@ export default function DashboardPage() {
     const bills = (billsData || []) as FixedBill[];
     const payments = (payData || []) as FixedBillPayment[];
     const committed = committedAmount(bills, payments);
+
+    const paidIds = new Set(payments.filter((p) => p.is_paid).map((p) => p.fixed_bill_id));
+    setFixedBills(
+      bills.map((b) => ({
+        id: b.id,
+        name: b.name,
+        amount: Number(b.amount) || 0,
+        isPaid: paidIds.has(b.id),
+      }))
+    );
 
     setCashflow({
       available: availableAmount(checking, committed),
@@ -684,11 +695,7 @@ export default function DashboardPage() {
 
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-lg">
-        <AvailableGauge
-          available={cashflow.available}
-          committed={cashflow.committed}
-          formatCurrency={formatCurrency}
-        />
+        <FixedBillsProgress bills={fixedBills} formatCurrency={formatCurrency} />
         <BudgetBuckets buckets={buckets} income={budgetIncome} formatCurrency={formatCurrency} />
         <CategoryDonut data={categoryExpenses} formatCurrency={formatCurrency} />
         <GoalsProgress goals={goals} formatCurrency={formatCurrency} />
